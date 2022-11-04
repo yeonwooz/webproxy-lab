@@ -1,5 +1,5 @@
 /*
- * adder.c - a minimal CGI program that adds two numbers together
+ * adder.c - a mini  CGI program that adds two numbers together
  * 
  * cgi 프로그램이란??
  * 

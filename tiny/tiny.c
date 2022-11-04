@@ -166,14 +166,14 @@ void serve_static(int fd, char *filename, int filesize, char* method)
 
   /* Send response body to client */
   srcfd = Open(filename, O_RDONLY, 0); //공통
-  // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
-  srcp = (char*)malloc(filesize); 
-  Rio_readn(srcfd, srcp, filesize);
+  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+//   srcp = (char*)malloc(filesize); 
+//   Rio_readn(srcfd, srcp, filesize);
 
   Close(srcfd);  //공통
   Rio_writen(fd, srcp, filesize);   //공통
-  // Munmap(srcp, filesize);   //11.9
-  free(srcp);
+  Munmap(srcp, filesize);   //11.9
+//   free(srcp);
   }
 
  /*

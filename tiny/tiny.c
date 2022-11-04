@@ -41,3 +41,10 @@ int main(int argc, char **argv) {
     Close(connfd);  // line:netp:tiny:close
   }
 }
+
+void doit(int fd) {
+  /* 요청헤더를 읽는다 */
+
+  /* GET요청으로부터 URI를 파싱한다 */
+  
+}

@@ -18,7 +18,6 @@ void serve_dynamic(int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 
 int main(int argc, char **argv) {
-  printf("starts tiny server!");
   int listenfd, connfd;
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
@@ -27,6 +26,7 @@ int main(int argc, char **argv) {
   /* Check command line args */
   if (argc != 2) {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
+    printf("cannot start tiny server!");
     exit(1);
   }
 

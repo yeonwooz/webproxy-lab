@@ -41,3 +41,15 @@ int main(int argc, char **argv) {
     Close(connfd);  // line:netp:tiny:close
   }
 }
+
+void doit(int fd) {
+  size_t n;
+  char buf[MAXLINE];
+  rio_t rio;
+
+  Rio_readinitb(&rio, fd);
+  while ( (n = Rio_readlineb(&rio, buf, MAXLINE)) != 0) {
+    printf("server received %d bytes\n", (int)n);
+    Rio_writen(fd, buf, n);
+  }
+}

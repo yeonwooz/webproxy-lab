@@ -4,6 +4,7 @@
  *     GET method to serve static and dynamic content.
  */
 #include "csapp.h"
+#include <stdlib.h>
 
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
@@ -71,20 +72,19 @@ void doit(int fd)
     }                                                    //line:netp:doit:endnotfound
 
     if (is_static) { /* Serve static content */          
-	if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) { //line:netp:doit:readable
-	    clienterror(fd, filename, "403", "Forbidden",
-			"Tiny couldn't read the file");
-	    return;
-	}
-	serve_static(fd, filename, sbuf.st_size);        //line:netp:doit:servestatic
+    if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) { //line:netp:doit:readable
+        clienterror(fd, filename, "403", "Forbidden",
+        "Tiny couldn't read the file");
+        return;
     }
-  else { /* Serve dynamic content */
-    if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { //line:netp:doit:executable
-	    clienterror(fd, filename, "403", "Forbidden",
-			"Tiny couldn't run the CGI program");
+	  serve_static(fd, filename, sbuf.st_size);        //line:netp:doit:servestatic
+    }
+    else { /* Serve dynamic content */
+      if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { //line:netp:doit:executable
+	      clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
 	    return;
-	}
-	serve_dynamic(fd, filename, cgiargs);            //line:netp:doit:servedynamic
+	  }
+	  serve_dynamic(fd, filename, cgiargs);            //line:netp:doit:servedynamic
   }
 }
 /* $end doit */
@@ -159,10 +159,14 @@ void serve_static(int fd, char *filename, int filesize)
 
     /* Send response body to client */
     srcfd = Open(filename, O_RDONLY, 0);    //line:netp:servestatic:open
-    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);//line:netp:servestatic:mmap
+
+    // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);//line:netp:servestatic:mmap
+    srcp = (char *)malloc(filesize);
+    Rio_readn(srcfd, srcp, filesize);
     Close(srcfd);                           //line:netp:servestatic:close
     Rio_writen(fd, srcp, filesize);         //line:netp:servestatic:write
-    Munmap(srcp, filesize);                 //line:netp:servestatic:munmap
+    // Munmap(srcp, filesize);                 //line:netp:servestatic:munmap
+    free(srcp);
 }
 
 /*

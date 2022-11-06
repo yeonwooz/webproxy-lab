@@ -34,8 +34,8 @@ int main(int argc, char **argv)
       clientlen = sizeof(clientaddr);
 	    connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
       printf("tiny server!\n");
-      echo(connfd);
-	    // doit(connfd);                                             //line:netp:tiny:doit
+      // echo(connfd);
+	    doit(connfd);                                             //line:netp:tiny:doit
 	    Close(connfd);                                            //line:netp:tiny:close
     }
 }
@@ -60,6 +60,7 @@ void doit(int fd)
     printf("%s", buf);
     sscanf(buf, "%s %s %s", method, uri, version);       //line:netp:doit:parserequest
     if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
+        printf("501 ERROR\n");
         //line:netp:doit:beginrequesterr
        clienterror(fd, method, "501", "Not Implemented",
                 "Tiny does not implement this method");
@@ -103,6 +104,7 @@ void read_requesthdrs(rio_t *rp)
 
     Rio_readlineb(rp, buf, MAXLINE);
     while(strcmp(buf, "\r\n")) {          //line:netp:readhdrs:checkterm
+      printf("read_requesthdrs\n");
 	    Rio_readlineb(rp, buf, MAXLINE);
 	    printf("%s", buf);
     }

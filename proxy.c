@@ -1,6 +1,8 @@
 #include "csapp.h"
 #include "echo.c"
 
+void doit(int connfd);
+
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
@@ -15,9 +17,6 @@ int main(int argc, char **argv) {
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
   char client_hostname[MAXLINE], client_port[MAXLINE]; // 프록시가 요청을 받고 응답해줄 클라이언트의 IP, Port
-  // char server_hostname[MAXLINE], server_port[MAXLINE]; // 프록시가 요청을 보낼 서버의 IP, Port
-  char server_hostname[MAXLINE] = "43.201.51.191";
-  char server_port[MAXLINE] = "8000";
 
   if (argc != 2) {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
@@ -30,6 +29,16 @@ int main(int argc, char **argv) {
     connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // 프록시가 서버로서 클라이언트와 맺는 파일 디스크립터(소켓 디스크립터) : 고유 식별되는 회선이자 메모리 그 자체
     Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
     printf("Connected to (%s, %s)\n", client_hostname, client_port);
+    doit(connfd); // 프록시가 중개를 시작
+    Close(connfd);
+  }
+  return 0;
+}
+
+void doit(int connfd) {
+    // char server_hostname[MAXLINE], server_port[MAXLINE]; // 프록시가 요청을 보낼 서버의 IP, Port
+    char server_hostname[MAXLINE] = "43.201.51.191";
+    char server_port[MAXLINE] = "8000";
     char buf[MAXLINE];
 
     rio_t rio1;
@@ -45,15 +54,9 @@ int main(int argc, char **argv) {
       Rio_writen(connfd, buf, n);   // connfd 로 받은 내용을 buf에 witen 하기 
 
       // while (Fgets(buf, MAXLINE, stdin) != NULL) {
-          printf("proxy is now working\n");
           Rio_writen(clientfd, buf, strlen(buf)); // 내가 서버에 req 보냄
           Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 읽기
           Fputs(buf, stdout);
       // }
-      // Close(clientfd);
     }
-    // Close(connfd);
-    // exit(0);
-  }
-  // exit(0);
 }

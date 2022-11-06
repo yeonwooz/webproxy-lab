@@ -32,6 +32,8 @@ int main(int argc, char **argv)
     while (1) {
       clientlen = sizeof(clientaddr);
 	    connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
+      printf("tiny server!");
+      // echo(connfd);
 	    doit(connfd);                                             //line:netp:tiny:doit
 	    Close(connfd);                                            //line:netp:tiny:close
     }

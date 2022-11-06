@@ -4,7 +4,6 @@
  *     GET method to serve static and dynamic content.
  */
 #include "csapp.h"
-#include <stdlib.h>
 
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
@@ -122,7 +121,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 	    strcpy(filename, ".");                           //line:netp:parseuri:beginconvert1
 	    strcat(filename, uri);                           //line:netp:parseuri:endconvert1
 	    if (uri[strlen(uri)-1] == '/')                   //line:netp:parseuri:slashcheck
-	      strcat(filename, "form-adder.html");               //line:netp:parseuri:appenddefault  
+	      strcat(filename, "home.html");               //line:netp:parseuri:appenddefault  
 	    return 1;
     }
     else {  /* Dynamic content */                        //line:netp:parseuri:isdynamic
@@ -135,10 +134,6 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
         strcpy(cgiargs, "");                         //line:netp:parseuri:endextract
       strcpy(filename, ".");                           //line:netp:parseuri:beginconvert2
       strcat(filename, uri);                           //line:netp:parseuri:endconvert2
-      // strcat(filename, ".html");  
-      // ptr = index(filename, '/'); 
-      // *ptr = '\0';   
-      // strcat(filename, 'home.html');   
       return 0;
     }
 }

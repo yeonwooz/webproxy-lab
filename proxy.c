@@ -32,26 +32,28 @@ int main(int argc, char **argv) {
     printf("Connected to (%s, %s)\n", client_hostname, client_port);
     char buf[MAXLINE];
 
-    rio_t rio;
+    rio_t rio1;
+    rio_t rio2;
     size_t n;
     int clientfd = Open_clientfd(server_hostname, server_port);
     // echo(connfd);
-    Rio_readinitb(&rio, connfd);  // 클라이언트와 connection 시작
+    Rio_readinitb(&rio1, connfd);  // 클라이언트와 connection 시작
+    Rio_readinitb(&rio2, clientfd);
 
-    while ((n = Rio_readlineb(&rio, buf, MAXLINE)) != 0) {
+    while ((n = Rio_readlineb(&rio1, buf, MAXLINE)) != 0) {
       printf("server received %d bytes\n", (int)n);
       Rio_writen(connfd, buf, n);   // connfd 로 받은 내용을 buf에 witen 하기 
-      Rio_readinitb(&rio, clientfd);
-      while (Fgets(buf, MAXLINE, stdin) != NULL) {
+
+      // while (Fgets(buf, MAXLINE, stdin) != NULL) {
           printf("proxy is now working\n");
-          Rio_writen(clientfd, buf, strlen(buf));
-          Rio_readlineb(&rio, buf, MAXLINE);
+          Rio_writen(clientfd, buf, strlen(buf)); // 내가 서버에 req 보냄
+          Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 읽기
           Fputs(buf, stdout);
-      }
-      Close(clientfd);
+      // }
+      // Close(clientfd);
     }
-    Close(connfd);
-    exit(0);
+    // Close(connfd);
+    // exit(0);
   }
-  exit(0);
+  // exit(0);
 }

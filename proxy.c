@@ -4,6 +4,8 @@
 int parse_uri(char *uri, char *filename, char *cgiargs);
 void get_filetype(char *filename, char *filetype);
 void doit(int connfd);
+void clienterror(int fd, char *cause, char *errnum, 
+		 char *shortmsg, char *longmsg);
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -42,6 +44,7 @@ void doit(int connfd) {
     char server_hostname[MAXLINE] = "43.201.51.191";
     char server_port[MAXLINE] = "8000";
     char buf[MAXLINE];
+    char method[MAXLINE], uri[MAXLINE], version[MAXLINE];
 
     rio_t rio1;
     rio_t rio2;
@@ -59,20 +62,23 @@ void doit(int connfd) {
       Rio_writen(clientfd, buf, strlen(buf)); // 내가 서버에 req 보냄
       
       printf("4.[I'm proxy] server -> proxy\n");
-      Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 받음
+      Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 받음 (헤더 받음)
       printf("srcp=%s\n", buf);
-      
+      sscanf(buf, "%s %s %s", method, uri, version);       
+
+      if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
+        printf("[PROXY]501 ERROR\n");
+        clienterror(connfd, method, "501", "Not Implemented",
+                "Tiny does not implement this method");
+        return;
+    }  
   
       int srcfd;
       char *srcp, filetype[MAXLINE];
 
+      srcfd = open("./temp_home.html", O_WRONLY | O_CREAT | O_APPEND, MAXLINE);
       get_filetype("./temp_home.html", filetype);
-      // sprintf(buf, "HTTP/1.0 200 OK\r\n");    //line:netp:servestatic:beginserve
-      // sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
-      // sprintf(buf, "%sContent-length: %d\r\n", buf, MAXLINE);
-      // sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
-      Rio_writen(connfd, buf, strlen(buf));       //line:netp:servestatic:endserve
-
+      // Rio_writen(connfd, buf, strlen(buf));       //line:netp:servestatic:endserve
 
       srcfd = Open("./temp_home.html", O_RDONLY, 0);
       srcp = (char *)malloc(MAXLINE);
@@ -89,8 +95,6 @@ void doit(int connfd) {
       // }
     }
 }
-
-
 
 /*
  * get_filetype - derive file type from file name
@@ -149,3 +153,30 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
       return 0;
     }
 }
+
+/*
+ * clienterror - returns an error message to the client
+ */
+/* $begin clienterror */
+void clienterror(int fd, char *cause, char *errnum, 
+		 char *shortmsg, char *longmsg) 
+{
+    char buf[MAXLINE], body[MAXBUF];
+
+    /* Build the HTTP response body */
+    sprintf(body, "<html><title>Tiny Error</title>");
+    sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
+    sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
+    sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
+    sprintf(body, "%s<hr><em>The Tiny Web server</em>\r\n", body);
+
+    /* Print the HTTP response */
+    sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
+    Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "Content-type: text/html\r\n");
+    Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "Content-length: %d\r\n\r\n", (int)strlen(body));
+    Rio_writen(fd, buf, strlen(buf));
+    Rio_writen(fd, body, strlen(body));
+}
+/* $end clienterror */

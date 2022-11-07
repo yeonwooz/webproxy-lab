@@ -1,16 +1,11 @@
 #include "csapp.h"
 #include "echo.c"
 
-struct req_content {
-	char host[MAXLINE];
-	char path[MAXLINE];
-	int port;
-};
-
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
 void make_response(int fd, char *buf);
+void parse_uri(char *uri,char *hostname,char *path,int *port);
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -44,58 +39,53 @@ int main(int argc, char **argv) {
     Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
     printf("Connected to (%s, %s)\n", client_hostname, client_port);
     doit(connfd); // 프록시가 중개를 시작
+    Close(connfd);
   }
   return 0;
 }
 
-void doit(int connfd) {
-    // char server_hostname[MAXLINE], server_port[MAXLINE]; // 프록시가 요청을 보낼 서버의 IP, Port
-    char server_hostname[MAXLINE] = "43.201.51.191";
-    char server_port[MAXLINE] = "8000";
+void doit(int client_fd) {
+    char hostname[MAXLINE], path[MAXLINE];  // 프록시가 요청을 보낼 서버의 hostname, 파일경로
+    int port = 80;    // 서버 포트 80 고정 
+    
     char buf[MAXLINE], hdr[MAXLINE], new_request[MAXBUF], response[1<<15];;
     char method[MAXLINE], uri[MAXLINE], version[MAXLINE];
-    struct req_content content;
 
-    rio_t rio1;     // 클라이언트와의 rio
-    rio_t rio2;     // 서버와의 rio
-    size_t n;
+    int server_fd;
 
-    Rio_readinitb(&rio1, connfd);  // 클라이언트와 connection 시작
-    Rio_readlineb(&rio1, buf, MAXLINE);
+    rio_t client_rio;     // 클라이언트와의 rio
+    rio_t server_rio;     // 서버와의 rio
+
+    Rio_readinitb(&client_rio, client_fd);  // 클라이언트와 connection 시작
+    Rio_readlineb(&client_rio, buf, MAXLINE);
+
     sscanf(buf, "%s %s %s", method, uri, version);       // 클라이언트에서 받은 요청 파싱(method, uri, version 뽑아냄)
 
     if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
         printf("[PROXY]501 ERROR\n");
-        clienterror(connfd, method, "501", "Not Implemented",
+        clienterror(client_fd, method, "501", "Not Implemented",
                 "Tiny does not implement this method");
         return;
     } 
-    parse_uri(uri, &content);
-		read_requesthdrs(&rio1, hdr);
 
-		sprintf(new_request, "GET %s HTTP/1.0\r\n", content.path);
-    strcat(new_request, hdr);
-		strcat(new_request, user_agent_hdr);
-		strcat(new_request, accept_hdr);
-		strcat(new_request, accept_encoding_hdr);
-		strcat(new_request, connection_hdr);
-		strcat(new_request, proxy_conn_hdr);
-		strcat(new_request, "\r\n");
+    parse_uri(uri, hostname, path, port);
+    //TODO==========================================================
 
-    int clientfd = Open_clientfd(server_hostname, server_port);
+    server_fd = Open_clientfd(hostname, port);
+
+    Rio_readinitb(&server_rio, server_fd);
 
     printf("2.[I'm proxy] proxy -> server\n");
-    Rio_writen(clientfd, new_request, strlen(new_request)); // 서버에 req 보냄
-    
-    printf("4.[I'm proxy] server -> proxy\n");
-		Rio_readlineb(clientfd, response, sizeof(response));
-    Close(clientfd);
+    Rio_writen(server_fd, new_request, strlen(new_request)); // 서버에 req 보냄
 
-    printf("5.[I'm proxy] proxy -> client\n");
+    size_t n;
+    while ((n=Rio_readlineb(&server_rio, buf, MAXLINE)) !=0) {
+      printf("4.[I'm proxy] server -> proxy\n");  // 서버에서 응답 받음
 
-    // make_response(connfd, new_request);                 
-	  Rio_writen(connfd, response, sizeof(response));
-
+      printf("5.[I'm proxy] proxy -> client\n");
+      Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
+    }
+    Close(server_fd);
 }
 
 
@@ -148,3 +138,6 @@ void make_response(int fd, char *contents)
     Rio_writen(fd, body, strlen(body));
 }
 
+void parse_uri(char *uri,char *hostname, char *path, int *port) {
+  printf("[parse_uri] %s %s %s %d\n", uri, hostname, path, port);
+}

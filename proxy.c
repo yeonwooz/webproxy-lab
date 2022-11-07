@@ -53,52 +53,35 @@ void doit(int connfd) {
     int clientfd = Open_clientfd(server_hostname, server_port);
     // echo(connfd);
     Rio_readinitb(&rio1, connfd);  // 클라이언트와 connection 시작
+    Rio_readlineb(&rio1, buf, MAXLINE);
+
     Rio_readinitb(&rio2, clientfd); // 서버와 connection 시작
 
-    while ((n = Rio_readlineb(&rio1, buf, MAXLINE)) != 0) {
-      // while (Fgets(buf, MAXLINE, stdin) != NULL) {
-      sscanf(buf, "%s %s %s", method, uri, version);       // 클라이언트에서 받은 요청 파싱(method, uri, version 뽑아냄)
-      printf("strcasecmp(method,'GET')=%d\n", strcasecmp(method,"GET"));
-      printf("=====>  method=%s uri=%s version=%s\n", method, uri, version);
 
-      printf("2.[I'm proxy] proxy -> server\n");
-      Rio_writen(clientfd, buf, strlen(buf)); // 내가 서버에 req 보냄
-      
-      printf("4.[I'm proxy] server -> proxy\n");
-      Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 받음 (헤더 받음)
-      
-      printf("bbbbbbbbbbuf=%s", buf);
-      Rio_writen(connfd, buf, strlen(buf)); 
+    sscanf(buf, "%s %s %s", method, uri, version);       // 클라이언트에서 받은 요청 파싱(method, uri, version 뽑아냄)
+    printf("=====>buf=%s  method=%s uri=%s version=%s\n", buf, method, uri, version);
 
-    // if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
-    //     printf("[PROXY]501 ERROR\n");
-    //     clienterror(connfd, method, "501", "Not Implemented",
-    //             "Tiny does not implement this method");
-    //     return;
-    //  }  
+    printf("2.[I'm proxy] proxy -> server\n");
+    Rio_writen(clientfd, buf, strlen(buf)); // 내가 서버에 req 보냄
+    
+    printf("4.[I'm proxy] server -> proxy\n");
+    Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 받음 (헤더 받음)
 
-      printf("should respond\n");
-      // int srcfd;
-      // char *srcp, filetype[MAXLINE];
+    printf("bbbbbbbbbbuf=%s", buf);
+    Rio_writen(connfd, buf, strlen(buf)); 
 
-      // srcfd = open("./temp_home.html", O_WRONLY | O_CREAT | O_APPEND, MAXLINE);
-      // get_filetype("./temp_home.html", filetype);
-      // // Rio_writen(connfd, buf, strlen(buf));       //line:netp:servestatic:endserve
+  // if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
+  //     printf("[PROXY]501 ERROR\n");
+  //     clienterror(connfd, method, "501", "Not Implemented",
+  //             "Tiny does not implement this method");
+  //     return;
+  //  }  
 
-      // srcfd = Open("./temp_home.html", O_RDONLY, 0);
-      // srcp = (char *)malloc(MAXLINE);
-      // Rio_readn(srcfd, srcp, MAXLINE);
-      // Rio_writen(connfd, srcp, n);   // connfd 로 받은 내용을 buf에 witen 하기 
-      // free(srcp);
-
-
-
-      printf("5.[I'm proxy] proxy -> client\n");
-      // Rio_writen(connfd, buf, n);   // connfd 로 받은 내용을 buf에 witen 하기 
-      make_response(connfd);  
-      Fputs(buf, stdout);
-      // }
-    }
+    printf("should respond\n");
+    printf("5.[I'm proxy] proxy -> client\n");
+    // Rio_writen(connfd, buf, n);   // connfd 로 받은 내용을 buf에 witen 하기 
+    make_response(connfd);  
+    Fputs(buf, stdout);
 }
 
 /*

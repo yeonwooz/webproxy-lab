@@ -185,11 +185,11 @@ void serve_static(int fd, char *filename, int filesize, char* method)
     // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);//line:netp:servestatic:mmap
     srcp = (char *)malloc(filesize);
     Rio_readn(srcfd, srcp, filesize);
-    Close(srcfd);                           //line:netp:servestatic:close
 
     printf("3. [I'm server] server -> proxy\n");
     printf("srcp=%s, filesize=%d\n", srcp, filesize);
     Rio_writen(fd, srcp, filesize);         //line:netp:servestatic:write
+    // Close(srcfd);                           //line:netp:servestatic:close
     // Munmap(srcp, filesize);                 //line:netp:servestatic:munmap
     free(srcp);
 }

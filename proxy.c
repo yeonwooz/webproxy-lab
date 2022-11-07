@@ -7,13 +7,10 @@ struct req_content {
 	int port;
 };
 
-void get_filetype(char *filename, char *filetype);
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
 void make_response(int fd, char *buf);
-int read_requesthdrs(rio_t *rp, char *data);
-void parse_uri(char *uri, struct req_content *content);
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -100,52 +97,6 @@ void doit(int connfd) {
 
 }
 
-/*
- * get_filetype - derive file type from file name
- */
-void get_filetype(char *filename, char *filetype) 
-{
-    if (strstr(filename, ".html"))
-	    strcpy(filetype, "text/html");
-    else if (strstr(filename, ".gif"))
-	    strcpy(filetype, "image/gif");
-    else if (strstr(filename, ".png"))
-	    strcpy(filetype, "image/png");
-    else if (strstr(filename, ".jpg"))
-	    strcpy(filetype, "image/jpeg");
-    else if (strstr(filename, ".mpg"))
-	    strcpy(filetype, "video/mp4");
-    else if (strstr(filename, ".mp4"))
-	    strcpy(filetype, "video/mp4");
-    else if (strstr(filename, ".mov"))
-	    strcpy(filetype, "video/mp4");
-    else
-	    strcpy(filetype, "text/plain");
-}  
-
-void parse_uri(char *uri, struct req_content *content) {
-	char temp[MAXLINE];
-	
-	//Extract the path to the resource
-	if(strstr(uri,"http://") != NULL)
-	       sscanf( uri, "http://%[^/]%s", temp, content->path); 
-	else
-		sscanf( uri, "%[^/]%s", temp, content->path); 
-		
-	//Extract the port number and the hostname
-	if( strstr(temp, ":") != NULL)
-		sscanf(temp,"%[^:]:%d", content->host, &content->port);	
-	else {
-		strcpy(content->host,temp);
-		content->port = 80;
-	}
-	
-	// incase the path to resource is empty
-	if(!content->path[0])
-		strcpy(content->path,"./");
-
-}
-
 
 /*
  * clienterror - returns an error message to the client
@@ -196,38 +147,3 @@ void make_response(int fd, char *contents)
     Rio_writen(fd, body, strlen(body));
 }
 
-int read_requesthdrs(rio_t *rp, char *data) {
-    char buf[MAXLINE];
-    int ret = 0;
-  
-    while (strcmp(buf, "\r\n")) {
-      Rio_readlineb(rp, buf, MAXLINE);
-
-    	if(!strcmp(buf, "\r\n"))
-    		continue;
-
-    	if(strstr(buf, "User-Agent:")) 
-    		continue;
-
-    	if(strstr(buf, "Accept:"))
-    		continue;
-
-    	if(strstr(buf, "Accept-Encoding:"))
-    		continue;
-
-    	if(strstr(buf, "Connection:"))
-    		continue;
-
-    	if(strstr(buf, "Proxy-Connection:")) 
-    		continue;
-    	
-    	if(strstr(buf, "Host:")) {
-    		sprintf(data, "%s%s", data, buf);
-    		ret = 1;
-    		continue;
-    	}
-
-    	sprintf(data, "%s%s", data, buf);
-    }
-    return ret;
-}

@@ -7,6 +7,7 @@ void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
 void make_response(int fd);
+void read_requesthdrs(rio_t *rp);
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -50,7 +51,7 @@ void doit(int connfd) {
     rio_t rio2;     // 서버와의 rio
     size_t n;
     int clientfd = Open_clientfd(server_hostname, server_port);
-    // echo(connfd);
+
     Rio_readinitb(&rio1, connfd);  // 클라이언트와 connection 시작
     Rio_readlineb(&rio1, buf, MAXLINE);
 
@@ -65,14 +66,17 @@ void doit(int connfd) {
                 "Tiny does not implement this method");
         return;
     } 
-
+                             
     printf("2.[I'm proxy] proxy -> server\n");
-    Rio_writen(clientfd, buf, strlen(buf)); // 내가 서버에 req 보냄
+    Rio_writen(clientfd, buf, strlen(buf)); // 서버에 req 보냄
     
     printf("4.[I'm proxy] server -> proxy\n");
     Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 받음 (헤더 받음) 
-
+  
+  
+    read_requesthdrs(&rio1); 
     printf("5.[I'm proxy] proxy -> client\n");
+
     Rio_writen(connfd, buf, strlen(buf));   // connfd 로 받은 내용을 buf에 witen 하기 
     Fputs(buf, stdout);
 }
@@ -180,3 +184,22 @@ void make_response(int fd)
     Rio_writen(fd, buf, strlen(buf));
     Rio_writen(fd, body, strlen(body));
 }
+
+
+/*
+ * read_requesthdrs - read and parse HTTP request headers
+ */
+/* $begin read_requesthdrs */
+void read_requesthdrs(rio_t *rp) 
+{
+    char buf[MAXLINE];
+
+    Rio_readlineb(rp, buf, MAXLINE);
+    while(strcmp(buf, "\r\n")) {          //line:netp:readhdrs:checkterm
+      printf("read_requesthdrs\n");
+	    Rio_readlineb(rp, buf, MAXLINE);
+	    printf("%s", buf);
+    }
+    return;
+}
+/* $end read_requesthdrs */

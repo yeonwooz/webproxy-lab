@@ -68,7 +68,7 @@ void doit(int fd)
         return;
     }                                                   
 
-    read_requesthdrs(&rio);                              
+    // read_requesthdrs(&rio);                            
 
     printf("[server]starts parse\n");
     /* Parse URI from GET request */

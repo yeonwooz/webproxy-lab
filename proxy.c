@@ -1,13 +1,19 @@
 #include "csapp.h"
 #include "echo.c"
 
-int parse_uri(char *uri, char *filename, char *cgiargs);
+struct req_content {
+	char host[MAXLINE];
+	char path[MAXLINE];
+	int port;
+};
+
 void get_filetype(char *filename, char *filetype);
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
 void make_response(int fd);
-void read_requesthdrs(rio_t *rp);
+int read_requesthdrs(rio_t *rp, char *data);
+void parse_uri(char *uri, struct req_content *content);
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -17,6 +23,10 @@ void read_requesthdrs(rio_t *rp);
 static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
     "Firefox/10.0.3\r\n";
+static const char *accept_hdr = "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n";
+static const char *accept_encoding_hdr = "Accept-Encoding: gzip, deflate\r\n";
+static const char *connection_hdr = "Connection: close\r\n";
+static const char *proxy_conn_hdr = "Proxy-Connection: close\r\n";
 
 int main(int argc, char **argv) {
   int listenfd, connfd;
@@ -44,8 +54,9 @@ void doit(int connfd) {
     // char server_hostname[MAXLINE], server_port[MAXLINE]; // 프록시가 요청을 보낼 서버의 IP, Port
     char server_hostname[MAXLINE] = "43.201.51.191";
     char server_port[MAXLINE] = "8000";
-    char buf[MAXLINE];
+    char buf[MAXLINE], hdr[MAXLINE], new_request[MAXBUF];
     char method[MAXLINE], uri[MAXLINE], version[MAXLINE];
+    struct req_content content;
 
     rio_t rio1;     // 클라이언트와의 rio
     rio_t rio2;     // 서버와의 rio
@@ -72,12 +83,27 @@ void doit(int connfd) {
     
     printf("4.[I'm proxy] server -> proxy\n");
     Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 받음 (헤더 받음) 
-  
-  
-    read_requesthdrs(&rio1); 
-    printf("5.[I'm proxy] proxy -> client\n");
+    
 
-    Rio_writen(connfd, buf, strlen(buf));   // connfd 로 받은 내용을 buf에 witen 하기 
+    parse_uri(uri, &content);
+
+
+    printf("[form server buf]%s", buf);
+    printf("5.[I'm proxy] proxy -> client\n");
+		read_requesthdrs(&rio1, hdr);
+
+		sprintf(new_request, "GET %s HTTP/1.0\r\n", content.path);
+
+
+		strcat(new_request, hdr);
+		strcat(new_request, user_agent_hdr);
+		strcat(new_request, accept_hdr);
+		strcat(new_request, accept_encoding_hdr);
+		strcat(new_request, connection_hdr);
+		strcat(new_request, proxy_conn_hdr);
+		strcat(new_request, "\r\n");
+
+    Rio_writen(connfd, new_request, strlen(new_request));   // connfd 로 받은 내용을 buf에 writen 하기 
     Fputs(buf, stdout);
 }
 
@@ -104,40 +130,29 @@ void get_filetype(char *filename, char *filetype)
 	    strcpy(filetype, "text/plain");
 }  
 
+void parse_uri(char *uri, struct req_content *content) {
+	char temp[MAXLINE];
+	
+	//Extract the path to the resource
+	if(strstr(uri,"http://") != NULL)
+	       sscanf( uri, "http://%[^/]%s", temp, content->path); 
+	else
+		sscanf( uri, "%[^/]%s", temp, content->path); 
+		
+	//Extract the port number and the hostname
+	if( strstr(temp, ":") != NULL)
+		sscanf(temp,"%[^:]:%d", content->host, &content->port);	
+	else {
+		strcpy(content->host,temp);
+		content->port = 80;
+	}
+	
+	// incase the path to resource is empty
+	if(!content->path[0])
+		strcpy(content->path,"./");
 
-/*
- * parse_uri - parse URI into filename and CGI args
- *             return 0 if dynamic content, 1 if static
- */
-/* $begin parse_uri */
-int parse_uri(char *uri, char *filename, char *cgiargs) 
-{
-    printf("[server]parse_uri\n");
-    char *ptr;
-
-    if (!strstr(uri, "cgi-bin")) {  /* Static content */ //line:netp:parseuri:isstatic
-	    strcpy(cgiargs, "");                             //line:netp:parseuri:clearcgi
-	    strcpy(filename, ".");                           //line:netp:parseuri:beginconvert1
-	    strcat(filename, uri);                           //line:netp:parseuri:endconvert1
-	    if (uri[strlen(uri)-1] == '/')                   //line:netp:parseuri:slashcheck
-	      strcat(filename, "home.html");               //line:netp:parseuri:appenddefault  
-      
-      printf("filename=%s\n", filename);
-	    return 1;
-    }
-    else {  /* Dynamic content */                        //line:netp:parseuri:isdynamic
-	    ptr = index(uri, '?');                           //line:netp:parseuri:beginextract
-	    if (ptr) {  
-	      strcpy(cgiargs, ptr+1);
-	      *ptr = '\0';
-	    }
-      else 
-        strcpy(cgiargs, "");                         //line:netp:parseuri:endextract
-      strcpy(filename, ".");                           //line:netp:parseuri:beginconvert2
-      strcat(filename, uri);                           //line:netp:parseuri:endconvert2
-      return 0;
-    }
 }
+
 
 /*
  * clienterror - returns an error message to the client
@@ -186,20 +201,38 @@ void make_response(int fd)
 }
 
 
-/*
- * read_requesthdrs - read and parse HTTP request headers
- */
-/* $begin read_requesthdrs */
-void read_requesthdrs(rio_t *rp) 
-{
+int read_requesthdrs(rio_t *rp, char *data) {
     char buf[MAXLINE];
+    int ret = 0;
+  
+    while (strcmp(buf, "\r\n")) {
+      Rio_readlineb(rp, buf, MAXLINE);
 
-    Rio_readlineb(rp, buf, MAXLINE);
-    while(strcmp(buf, "\r\n")) {          //line:netp:readhdrs:checkterm
-      printf("read_requesthdrs\n");
-	    Rio_readlineb(rp, buf, MAXLINE);
-	    printf("%s", buf);
+    	if(!strcmp(buf, "\r\n"))
+    		continue;
+
+    	if(strstr(buf, "User-Agent:")) 
+    		continue;
+
+    	if(strstr(buf, "Accept:"))
+    		continue;
+
+    	if(strstr(buf, "Accept-Encoding:"))
+    		continue;
+
+    	if(strstr(buf, "Connection:"))
+    		continue;
+
+    	if(strstr(buf, "Proxy-Connection:")) 
+    		continue;
+    	
+    	if(strstr(buf, "Host:")) {
+    		sprintf(data, "%s%s", data, buf);
+    		ret = 1;
+    		continue;
+    	}
+
+    	sprintf(data, "%s%s", data, buf);
     }
-    return;
+    return ret;
 }
-/* $end read_requesthdrs */

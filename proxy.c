@@ -53,7 +53,7 @@ void doit(int connfd) {
       printf("server received %d bytes\n", (int)n);
 
       // while (Fgets(buf, MAXLINE, stdin) != NULL) {
-      printf("2. [I'm proxy] proxy -> server\n");
+      printf("2.[I'm proxy] proxy -> server\n");
       Rio_writen(clientfd, buf, strlen(buf)); // 내가 서버에 req 보냄
       
       printf("4.[I'm proxy] server -> proxy\n");

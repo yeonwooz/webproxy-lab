@@ -68,7 +68,7 @@ void doit(int fd)
         return;
     }                                                   
 
-    // read_requesthdrs(&rio);                            
+    read_requesthdrs(&rio);                            
 
     printf("[server]starts parse\n");
     /* Parse URI from GET request */
@@ -133,10 +133,10 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 
     if (!strstr(uri, "cgi-bin")) {  /* Static content */ //line:netp:parseuri:isstatic
 	    strcpy(cgiargs, "");                             //line:netp:parseuri:clearcgi
-	    // strcpy(filename, ".");                           //line:netp:parseuri:beginconvert1
+	    strcpy(filename, ".");                           //line:netp:parseuri:beginconvert1
 	    strcat(filename, uri);                           //line:netp:parseuri:endconvert1
 	    if (uri[strlen(uri)-1] == '/')                   //line:netp:parseuri:slashcheck
-	      strcat(filename, "home.html");               //line:netp:parseuri:appenddefault  
+	      strcat(filename, "form-adder.html");               //line:netp:parseuri:appenddefault  
       
       printf("filename=%s\n", filename);
 	    return 1;

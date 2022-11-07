@@ -17,8 +17,12 @@ int main(int argc, char **argv) {
     Rio_readinitb(&rio, clientfd);
 
     while (Fgets(buf, MAXLINE, stdin) != NULL) {
-        Rio_writen(clientfd, buf, strlen(buf));
-        Rio_readlineb(&rio, buf, MAXLINE);
+        printf("1. [I'm client] client -> proxy\n");
+        Rio_writen(clientfd, buf, strlen(buf));         // 서버에 req 보냄
+
+        printf("6.[I'm client] proxy -> client\n");
+        Rio_readlineb(&rio, buf, MAXLINE);              // 서버의 res 받음
+
         Fputs(buf, stdout);
     }
     Close(clientfd);

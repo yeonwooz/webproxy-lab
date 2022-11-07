@@ -6,8 +6,7 @@ void get_filetype(char *filename, char *filetype);
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
-void make_response(int fd, char *cause, char *errnum, 
-		 char *shortmsg, char *longmsg);
+void make_response(int fd);
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -71,32 +70,32 @@ void doit(int connfd) {
       printf("bbbbbbbbbbuf=%s", buf);
       Rio_writen(connfd, buf, strlen(buf)); 
 
-    if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
-        printf("[PROXY]501 ERROR\n");
-        clienterror(connfd, method, "501", "Not Implemented",
-                "Tiny does not implement this method");
-        return;
-     }  
+    // if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
+    //     printf("[PROXY]501 ERROR\n");
+    //     clienterror(connfd, method, "501", "Not Implemented",
+    //             "Tiny does not implement this method");
+    //     return;
+    //  }  
 
       printf("should respond\n");
-      int srcfd;
-      char *srcp, filetype[MAXLINE];
+      // int srcfd;
+      // char *srcp, filetype[MAXLINE];
 
-      srcfd = open("./temp_home.html", O_WRONLY | O_CREAT | O_APPEND, MAXLINE);
-      get_filetype("./temp_home.html", filetype);
-      // Rio_writen(connfd, buf, strlen(buf));       //line:netp:servestatic:endserve
+      // srcfd = open("./temp_home.html", O_WRONLY | O_CREAT | O_APPEND, MAXLINE);
+      // get_filetype("./temp_home.html", filetype);
+      // // Rio_writen(connfd, buf, strlen(buf));       //line:netp:servestatic:endserve
 
-      srcfd = Open("./temp_home.html", O_RDONLY, 0);
-      srcp = (char *)malloc(MAXLINE);
-      Rio_readn(srcfd, srcp, MAXLINE);
-      Rio_writen(connfd, srcp, n);   // connfd 로 받은 내용을 buf에 witen 하기 
-      free(srcp);
+      // srcfd = Open("./temp_home.html", O_RDONLY, 0);
+      // srcp = (char *)malloc(MAXLINE);
+      // Rio_readn(srcfd, srcp, MAXLINE);
+      // Rio_writen(connfd, srcp, n);   // connfd 로 받은 내용을 buf에 witen 하기 
+      // free(srcp);
 
 
 
       printf("5.[I'm proxy] proxy -> client\n");
       // Rio_writen(connfd, buf, n);   // connfd 로 받은 내용을 buf에 witen 하기 
-      
+      make_response(connfd);  
       Fputs(buf, stdout);
       // }
     }
@@ -187,16 +186,13 @@ void clienterror(int fd, char *cause, char *errnum,
 }
 /* $end clienterror */
 
-void make_response(int fd, char *cause, char *errnum, 
-		 char *shortmsg, char *longmsg) 
+void make_response(int fd) 
 {
     char buf[MAXLINE], body[MAXBUF];
 
     /* Build the HTTP response body */
     sprintf(body, "<html><title>Tiny Server Proxy</title>");
     sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
-    sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
-    sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
     sprintf(body, "%s<hr><em>The Tiny Web server</em>\r\n", body);
 
     /* Print the HTTP response */

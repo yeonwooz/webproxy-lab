@@ -174,10 +174,10 @@ void serve_static(int fd, char *filename, int filesize, char* method)
     printf("Response headers:\n");
     printf("serve_static buffffff=>%s", buf);
 
-    if (!strcasecmp(method, "HEAD")){
-      // HEAD  메서드로 들어왔다면 스트링이 일치하여 0
-      return;
-    }
+    // if (!strcasecmp(method, "HEAD")){
+    //   // HEAD  메서드로 들어왔다면 스트링이 일치하여 0
+    //   return;
+    // }
 
     /* Send response body to client */
     srcfd = Open(filename, O_RDONLY, 0);    //line:netp:servestatic:open

@@ -1,6 +1,8 @@
 #include "csapp.h"
 #include "echo.c"
 
+int parse_uri(char *uri, char *filename, char *cgiargs);
+void get_filetype(char *filename, char *filetype);
 void doit(int connfd);
 
 /* Recommended max cache and object sizes */
@@ -58,11 +60,92 @@ void doit(int connfd) {
       
       printf("4.[I'm proxy] server -> proxy\n");
       Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 받음
+      printf("srcp=%s\n", buf);
+      
+  
+      int srcfd;
+      char *srcp, filetype[MAXLINE];
+
+      get_filetype("./temp_home.html", filetype);
+      // sprintf(buf, "HTTP/1.0 200 OK\r\n");    //line:netp:servestatic:beginserve
+      // sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+      // sprintf(buf, "%sContent-length: %d\r\n", buf, MAXLINE);
+      // sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
+      Rio_writen(connfd, buf, strlen(buf));       //line:netp:servestatic:endserve
+
+
+      srcfd = Open("./temp_home.html", O_RDONLY, 0);
+      srcp = (char *)malloc(MAXLINE);
+      Rio_readn(srcfd, srcp, MAXLINE);
+      Rio_writen(connfd, srcp, n);   // connfd 로 받은 내용을 buf에 witen 하기 
+      free(srcp);
+
+
 
       printf("5.[I'm proxy] proxy -> client\n");
-      Rio_writen(connfd, buf, n);   // connfd 로 받은 내용을 buf에 witen 하기 
+      // Rio_writen(connfd, buf, n);   // connfd 로 받은 내용을 buf에 witen 하기 
       
       Fputs(buf, stdout);
       // }
+    }
+}
+
+
+
+/*
+ * get_filetype - derive file type from file name
+ */
+void get_filetype(char *filename, char *filetype) 
+{
+    if (strstr(filename, ".html"))
+	    strcpy(filetype, "text/html");
+    else if (strstr(filename, ".gif"))
+	    strcpy(filetype, "image/gif");
+    else if (strstr(filename, ".png"))
+	    strcpy(filetype, "image/png");
+    else if (strstr(filename, ".jpg"))
+	    strcpy(filetype, "image/jpeg");
+    else if (strstr(filename, ".mpg"))
+	    strcpy(filetype, "video/mp4");
+    else if (strstr(filename, ".mp4"))
+	    strcpy(filetype, "video/mp4");
+    else if (strstr(filename, ".mov"))
+	    strcpy(filetype, "video/mp4");
+    else
+	    strcpy(filetype, "text/plain");
+}  
+
+
+/*
+ * parse_uri - parse URI into filename and CGI args
+ *             return 0 if dynamic content, 1 if static
+ */
+/* $begin parse_uri */
+int parse_uri(char *uri, char *filename, char *cgiargs) 
+{
+    printf("[server]parse_uri\n");
+    char *ptr;
+
+    if (!strstr(uri, "cgi-bin")) {  /* Static content */ //line:netp:parseuri:isstatic
+	    strcpy(cgiargs, "");                             //line:netp:parseuri:clearcgi
+	    strcpy(filename, ".");                           //line:netp:parseuri:beginconvert1
+	    strcat(filename, uri);                           //line:netp:parseuri:endconvert1
+	    if (uri[strlen(uri)-1] == '/')                   //line:netp:parseuri:slashcheck
+	      strcat(filename, "home.html");               //line:netp:parseuri:appenddefault  
+      
+      printf("filename=%s\n", filename);
+	    return 1;
+    }
+    else {  /* Dynamic content */                        //line:netp:parseuri:isdynamic
+	    ptr = index(uri, '?');                           //line:netp:parseuri:beginextract
+	    if (ptr) {  
+	      strcpy(cgiargs, ptr+1);
+	      *ptr = '\0';
+	    }
+      else 
+        strcpy(cgiargs, "");                         //line:netp:parseuri:endextract
+      strcpy(filename, ".");                           //line:netp:parseuri:beginconvert2
+      strcat(filename, uri);                           //line:netp:parseuri:endconvert2
+      return 0;
     }
 }

@@ -20,10 +20,11 @@ void make_response(int fd, char *buf);
 static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
     "Firefox/10.0.3\r\n";
-static const char *accept_hdr = "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n";
-static const char *accept_encoding_hdr = "Accept-Encoding: gzip, deflate\r\n";
-static const char *connection_hdr = "Connection: close\r\n";
-static const char *proxy_conn_hdr = "Proxy-Connection: close\r\n";
+static const char *conn_hdr = "Connection: close\r\n";
+static const char *prox_hdr = "Proxy-Connection: close\r\n";
+static const char *host_hdr_format = "Host: %s\r\n";
+static const char *requestlint_hdr_format = "GET %s HTTP/1.0\r\n";
+static const char *endof_hdr = "\r\n";
 
 int main(int argc, char **argv) {
   int listenfd, connfd;

@@ -6,6 +6,8 @@ void get_filetype(char *filename, char *filetype);
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
+void make_response(int fd, char *cause, char *errnum, 
+		 char *shortmsg, char *longmsg);
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -46,8 +48,8 @@ void doit(int connfd) {
     char buf[MAXLINE];
     char method[MAXLINE], uri[MAXLINE], version[MAXLINE];
 
-    rio_t rio1;
-    rio_t rio2;
+    rio_t rio1;     // 클라이언트와의 rio
+    rio_t rio2;     // 서버와의 rio
     size_t n;
     int clientfd = Open_clientfd(server_hostname, server_port);
     // echo(connfd);
@@ -55,24 +57,28 @@ void doit(int connfd) {
     Rio_readinitb(&rio2, clientfd); // 서버와 connection 시작
 
     while ((n = Rio_readlineb(&rio1, buf, MAXLINE)) != 0) {
-      printf("server received %d bytes\n", (int)n);
-
       // while (Fgets(buf, MAXLINE, stdin) != NULL) {
+      sscanf(buf, "%s %s %s", method, uri, version);       // 클라이언트에서 받은 요청 파싱(method, uri, version 뽑아냄)
+      printf("strcasecmp(method,'GET')=%d\n", strcasecmp(method,"GET"));
+      printf("=====>  method=%s uri=%s version=%s\n", method, uri, version);
+
       printf("2.[I'm proxy] proxy -> server\n");
       Rio_writen(clientfd, buf, strlen(buf)); // 내가 서버에 req 보냄
       
       printf("4.[I'm proxy] server -> proxy\n");
       Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 받음 (헤더 받음)
-      printf("srcp=%s\n", buf);
-      sscanf(buf, "%s %s %s", method, uri, version);       
+      
+      printf("bbbbbbbbbbuf=%s", buf);
+      Rio_writen(connfd, buf, strlen(buf)); 
 
-      if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
+    if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
         printf("[PROXY]501 ERROR\n");
         clienterror(connfd, method, "501", "Not Implemented",
                 "Tiny does not implement this method");
         return;
-    }  
-  
+     }  
+
+      printf("should respond\n");
       int srcfd;
       char *srcp, filetype[MAXLINE];
 
@@ -180,3 +186,25 @@ void clienterror(int fd, char *cause, char *errnum,
     Rio_writen(fd, body, strlen(body));
 }
 /* $end clienterror */
+
+void make_response(int fd, char *cause, char *errnum, 
+		 char *shortmsg, char *longmsg) 
+{
+    char buf[MAXLINE], body[MAXBUF];
+
+    /* Build the HTTP response body */
+    sprintf(body, "<html><title>Tiny Server Proxy</title>");
+    sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
+    sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
+    sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
+    sprintf(body, "%s<hr><em>The Tiny Web server</em>\r\n", body);
+
+    /* Print the HTTP response */
+    sprintf(buf, "HTTP/1.0 200 OK\r\n");    
+    Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "Content-type: text/html\r\n");
+    Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "Content-length: %d\r\n\r\n", (int)strlen(body));
+    Rio_writen(fd, buf, strlen(buf));
+    Rio_writen(fd, body, strlen(body));
+}

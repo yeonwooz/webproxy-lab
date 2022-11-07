@@ -74,6 +74,7 @@ void doit(int fd)
     /* Parse URI from GET request */
     is_static = parse_uri(uri, filename, cgiargs);       //line:netp:doit:staticcheck
     if (stat(filename, &sbuf) < 0) {                     //line:netp:doit:beginnotfound
+      printf("404 ERROR\n");
       clienterror(fd, filename, "404", "Not found", "Tiny couldn't find this file");
 	    return;
     }                                                    //line:netp:doit:endnotfound
@@ -132,7 +133,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 
     if (!strstr(uri, "cgi-bin")) {  /* Static content */ //line:netp:parseuri:isstatic
 	    strcpy(cgiargs, "");                             //line:netp:parseuri:clearcgi
-	    strcpy(filename, ".");                           //line:netp:parseuri:beginconvert1
+	    // strcpy(filename, ".");                           //line:netp:parseuri:beginconvert1
 	    strcat(filename, uri);                           //line:netp:parseuri:endconvert1
 	    if (uri[strlen(uri)-1] == '/')                   //line:netp:parseuri:slashcheck
 	      strcat(filename, "home.html");               //line:netp:parseuri:appenddefault  
@@ -253,6 +254,7 @@ void serve_dynamic(int fd, char *filename, char *cgiargs, char* method)
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg) 
 {
+    printf("client error\n");
     char buf[MAXLINE], body[MAXBUF];
 
     /* Build the HTTP response body */

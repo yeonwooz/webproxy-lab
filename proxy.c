@@ -11,7 +11,7 @@ void get_filetype(char *filename, char *filetype);
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
-void make_response(int fd);
+void make_response(int fd, char *buf);
 int read_requesthdrs(rio_t *rp, char *data);
 void parse_uri(char *uri, struct req_content *content);
 
@@ -54,22 +54,17 @@ void doit(int connfd) {
     // char server_hostname[MAXLINE], server_port[MAXLINE]; // 프록시가 요청을 보낼 서버의 IP, Port
     char server_hostname[MAXLINE] = "43.201.51.191";
     char server_port[MAXLINE] = "8000";
-    char buf[MAXLINE], hdr[MAXLINE], new_request[MAXBUF];
+    char buf[MAXLINE], hdr[MAXLINE], new_request[MAXBUF], response[1<<15];;
     char method[MAXLINE], uri[MAXLINE], version[MAXLINE];
     struct req_content content;
 
     rio_t rio1;     // 클라이언트와의 rio
     rio_t rio2;     // 서버와의 rio
     size_t n;
-    int clientfd = Open_clientfd(server_hostname, server_port);
 
     Rio_readinitb(&rio1, connfd);  // 클라이언트와 connection 시작
     Rio_readlineb(&rio1, buf, MAXLINE);
-
-    Rio_readinitb(&rio2, clientfd); // 서버와 connection 시작
-
     sscanf(buf, "%s %s %s", method, uri, version);       // 클라이언트에서 받은 요청 파싱(method, uri, version 뽑아냄)
-    printf("buf=%s  method=%s uri=%s version=%s\n", buf, method, uri, version);
 
     if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
         printf("[PROXY]501 ERROR\n");
@@ -77,25 +72,11 @@ void doit(int connfd) {
                 "Tiny does not implement this method");
         return;
     } 
-                             
-    printf("2.[I'm proxy] proxy -> server\n");
-    Rio_writen(clientfd, buf, strlen(buf)); // 서버에 req 보냄
-    
-    printf("4.[I'm proxy] server -> proxy\n");
-    Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 받음 (헤더 받음) 
-    
-
     parse_uri(uri, &content);
-
-
-    printf("[form server buf]%s", buf);
-    printf("5.[I'm proxy] proxy -> client\n");
 		read_requesthdrs(&rio1, hdr);
 
 		sprintf(new_request, "GET %s HTTP/1.0\r\n", content.path);
-
-
-		strcat(new_request, hdr);
+    strcat(new_request, hdr);
 		strcat(new_request, user_agent_hdr);
 		strcat(new_request, accept_hdr);
 		strcat(new_request, accept_encoding_hdr);
@@ -103,8 +84,20 @@ void doit(int connfd) {
 		strcat(new_request, proxy_conn_hdr);
 		strcat(new_request, "\r\n");
 
-    Rio_writen(connfd, new_request, strlen(new_request));   // connfd 로 받은 내용을 buf에 writen 하기 
-    Fputs(buf, stdout);
+    int clientfd = Open_clientfd(server_hostname, server_port);
+
+    printf("2.[I'm proxy] proxy -> server\n");
+    Rio_writen(clientfd, new_request, strlen(new_request)); // 서버에 req 보냄
+    
+    printf("4.[I'm proxy] server -> proxy\n");
+		Rio_readlineb(clientfd, response, sizeof(response));
+    Close(clientfd);
+
+    printf("5.[I'm proxy] proxy -> client\n");
+
+    // make_response(connfd, new_request);                 
+	  Rio_writen(connfd, response, sizeof(response));
+
 }
 
 /*
@@ -181,17 +174,20 @@ void clienterror(int fd, char *cause, char *errnum,
 }
 /* $end clienterror */
 
-void make_response(int fd) 
+
+void make_response(int fd, char *contents) 
 {
     char buf[MAXLINE], body[MAXBUF];
 
+    printf("contents===%s", contents);
+
     /* Build the HTTP response body */
-    sprintf(body, "<html><title>Tiny Server Proxy</title>");
+    sprintf(body, "<html><title>[PROXY]Tiny Error-make_response</title>");
     sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
     sprintf(body, "%s<hr><em>The Tiny Web server</em>\r\n", body);
 
     /* Print the HTTP response */
-    sprintf(buf, "HTTP/1.0 200 OK\r\n");    
+    sprintf(buf, "HTTP/1.0 200 OK\r\n");
     Rio_writen(fd, buf, strlen(buf));
     sprintf(buf, "Content-type: text/html\r\n");
     Rio_writen(fd, buf, strlen(buf));
@@ -199,7 +195,6 @@ void make_response(int fd)
     Rio_writen(fd, buf, strlen(buf));
     Rio_writen(fd, body, strlen(body));
 }
-
 
 int read_requesthdrs(rio_t *rp, char *data) {
     char buf[MAXLINE];

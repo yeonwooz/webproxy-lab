@@ -47,16 +47,22 @@ void doit(int connfd) {
     int clientfd = Open_clientfd(server_hostname, server_port);
     // echo(connfd);
     Rio_readinitb(&rio1, connfd);  // 클라이언트와 connection 시작
-    Rio_readinitb(&rio2, clientfd);
+    Rio_readinitb(&rio2, clientfd); // 서버와 connection 시작
 
     while ((n = Rio_readlineb(&rio1, buf, MAXLINE)) != 0) {
       printf("server received %d bytes\n", (int)n);
-      Rio_writen(connfd, buf, n);   // connfd 로 받은 내용을 buf에 witen 하기 
 
       // while (Fgets(buf, MAXLINE, stdin) != NULL) {
-          Rio_writen(clientfd, buf, strlen(buf)); // 내가 서버에 req 보냄
-          Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 읽기
-          Fputs(buf, stdout);
+      printf("2. [I'm proxy] proxy -> server\n");
+      Rio_writen(clientfd, buf, strlen(buf)); // 내가 서버에 req 보냄
+      
+      printf("4.[I'm proxy] server -> proxy\n");
+      Rio_readlineb(&rio2, buf, MAXLINE);  // 서버의 res 받음
+
+      printf("5.[I'm proxy] proxy -> client\n");
+      Rio_writen(connfd, buf, n);   // connfd 로 받은 내용을 buf에 witen 하기 
+      
+      Fputs(buf, stdout);
       // }
     }
 }

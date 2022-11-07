@@ -36,7 +36,7 @@ int main(int argc, char **argv)
       printf("tiny server!\n");
       // echo(connfd);
 	    doit(connfd);                                             //line:netp:tiny:doit
-	    Close(connfd);                                            //line:netp:tiny:close
+	    // Close(connfd);                                            //line:netp:tiny:close
     }
 }
 /* $end tinymain */
@@ -175,6 +175,8 @@ void serve_static(int fd, char *filename, int filesize, char* method)
     srcp = (char *)malloc(filesize);
     Rio_readn(srcfd, srcp, filesize);
     Close(srcfd);                           //line:netp:servestatic:close
+
+    printf("3. [I'm server] server -> proxy\n");
     Rio_writen(fd, srcp, filesize);         //line:netp:servestatic:write
     // Munmap(srcp, filesize);                 //line:netp:servestatic:munmap
     free(srcp);

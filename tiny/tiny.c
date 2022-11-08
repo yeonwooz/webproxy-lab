@@ -111,7 +111,6 @@ void read_requesthdrs(rio_t *rp)
 
     Rio_readlineb(rp, buf, MAXLINE);
     while(strcmp(buf, "\r\n")) {          //line:netp:readhdrs:checkterm
-      printf("read_requesthdrs\n");
 	    Rio_readlineb(rp, buf, MAXLINE);
 	    printf("%s", buf);
     }

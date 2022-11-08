@@ -4,13 +4,15 @@
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
-void parse_uri(char *uri,char *hostname,char *path,int *port);
+int parse_uri(char *uri, char *hostname, int *port, char *path);
 int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *hdr, char *method);
 void *thread(void *argptr);  // Pthread_create 에 루틴 반환형이 정의되어있음
+void read_requesthdrs(rio_t *rp);
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
+#define VERBOSE        0
 
 /* You won't lose style points for including this long line in your code */
 // https://developer.mozilla.org/ko/docs/Glossary/Request_header
@@ -20,9 +22,10 @@ static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
     "Firefox/10.0.3\r\n";
 static const char *connection_hdr = "Connection: close\r\n";
-static const char *proxy_connection_hdr = "Proxy-Connection: close\r\n";
-static const char *Accept_hdr = "    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n";
-static const char *EOL = "\r\n";
+static const char *Accept_hdr = "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n";
+static const char *Accept_encoding_hdr = "Accept-Encoding: gzip, deflate\r\n";
+static const char *proxy_connection_hdr = "Proxy-Connection: close\r\n\r\n";
+// static const char *EOL = "\r\n";
 
 int main(int argc, char **argv) {
   int listenfd, *clientfd;
@@ -39,11 +42,11 @@ int main(int argc, char **argv) {
   listenfd = Open_listenfd(argv[1]);  // 대기 회선
   while (1) {
     clientlen = sizeof(struct sockaddr_storage);
-    clientfd = (int *)Malloc(sizeof(int));   // 여러개의 디스크립터를 만들 것이므로 덮어쓰지 못하도록 고유메모리에 할당
-    *clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // 프록시가 서버로서 클라이언트와 맺는 파일 디스크립터(소켓 디스크립터) : 고유 식별되는 회선이자 메모리 그 자체
-    Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
+    // clientfd = (int *)Malloc(sizeof(int));   // 여러개의 디스크립터를 만들 것이므로 덮어쓰지 못하도록 고유메모리에 할당
+    int clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // 프록시가 서버로서 클라이언트와 맺는 파일 디스크립터(소켓 디스크립터) : 고유 식별되는 회선이자 메모리 그 자체
+    // Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
     printf("Connected to (%s, %s)\n", client_hostname, client_port);
-    doit(*clientfd); // 프록시가 중개를 시작
+    doit(clientfd); // 프록시가 중개를 시작
     // Pthread_create(&tid, NULL, thread, clientfd);
   }
   return 0;
@@ -53,6 +56,7 @@ void *thread(void *argptr) {
   int clientfd = *((int *)argptr);
   Pthread_detach(pthread_self);
   Free(argptr);
+  // Signal(SIGPIPE, sigpipe_handler);
   doit(clientfd);
   Close(clientfd);
   return NULL;
@@ -62,7 +66,7 @@ void doit(int client_fd) {
     char hostname[MAXLINE], path[MAXLINE];  // 프록시가 요청을 보낼 서버의 hostname, 파일경로
     int port;
     
-    char buf[MAXLINE], hdr[MAXLINE];
+    char buf[MAXLINE], hdr[MAXLINE], req_buf[MAXLINE];
     char method[MAXLINE], uri[MAXLINE], version[MAXLINE];
 
     int server_fd;
@@ -72,9 +76,13 @@ void doit(int client_fd) {
 
     Rio_readinitb(&client_rio, client_fd);  // 클라이언트와 connection 시작
     Rio_readlineb(&client_rio, buf, MAXLINE);  // 클라이언트의 요청(한줄) 받음 
+
+    if (strcmp(buf, "") == 0)
+        return;
+
     sscanf(buf, "%s %s %s", method, uri, version);       // 클라이언트에서 받은 요청 파싱(method, uri, version 뽑아냄)
 
-    if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
+    if (strcasecmp(method,"GET")) {     
       // 501 요청은 프록시 선에서 처리 
         printf("[PROXY]501 ERROR\n");
         clienterror(client_fd, method, "501", "Not Implemented",
@@ -82,16 +90,26 @@ void doit(int client_fd) {
         return;
     } 
 
-    parse_uri(uri, hostname, path, &port); // req uri 파싱하여 hostname, path, port(포인터) 변수에 할당
+    read_requesthdrs(&client_rio);
+
+    if (!parse_uri(uri, hostname, &port, path)) {
+         clienterror(client_fd, method, "404", "404 not found",
+                "Couldn't request file");
+        return;   
+    }
+    
+    // req uri 파싱하여 hostname, path, port(포인터) 변수에 할당
     printf("[out]hostname=%s port=%d path=%s\n", hostname, port, path);
-    if (!strlen(hostname)) {
-      clienterror(client_fd, method, "501", "No Hostname",
-                "Hostname is necessary");
-    }
-    if (!make_request(&client_rio, hostname, path, port, hdr, method)) {
-      clienterror(client_fd, method, "501", "request header error",
-              "Request header is wrong");      
-    }
+    
+    // if (!strlen(hostname)) {
+    //   clienterror(client_fd, method, "501", "No Hostname",
+    //             "Hostname is necessary");
+    // }
+
+    // if (!make_request(&client_rio, hostname, path, port, hdr, method)) {
+    //   clienterror(client_fd, method, "501", "request header error",
+    //           "Request header is wrong");      
+    // }
     
     char port_value[100];
     sprintf(port_value,"%d",port);
@@ -99,11 +117,22 @@ void doit(int client_fd) {
 
     Rio_readinitb(&server_rio, server_fd);  // 서버 소켓과 연결
 
-    Rio_writen(server_fd, hdr, strlen(hdr)); // 서버에 req 보냄
+    sprintf(req_buf, "GET %s HTTP/1.0\r\n", path);
+    Rio_writen(server_fd, req_buf, strlen(req_buf));
+	  sprintf(req_buf, "Host: %s\r\n", hostname);
+    Rio_writen(server_fd, req_buf, strlen(req_buf));
+    Rio_writen(server_fd, user_agent_hdr, strlen(user_agent_hdr));
+    Rio_writen(server_fd, Accept_hdr, strlen(Accept_hdr));
+    Rio_writen(server_fd, Accept_encoding_hdr, strlen(Accept_encoding_hdr));
+    Rio_writen(server_fd, connection_hdr, strlen(connection_hdr));
+    Rio_writen(server_fd, proxy_connection_hdr, strlen(proxy_connection_hdr));
 
     size_t n;
-    while ((n=Rio_readlineb(&server_rio, buf, MAXLINE)) > 0) {
-      Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
+    while ((n=Rio_readlineb(&server_rio, req_buf, MAXLINE)) != 0) {
+      Rio_writen(client_fd, req_buf, n);   // 클라이언트에게 응답 전달
+    }
+    if (n == 0) {
+      Rio_writen(server_fd, "\r\n", strlen("\r\n"));
     }
     Close(server_fd);
 }
@@ -135,12 +164,12 @@ void clienterror(int fd, char *cause, char *errnum,
 }
 /* $end clienterror */
 
-void parse_uri(char *uri,char *hostname, char *path, int *port) {
-  /*
+int parse_uri(char *uri, char *hostname, int *port, char *path) 
+{
+ /*
    uri가  
    / , /cgi-bin/adder 이렇게 들어올 수도 있고,
    http://11.22.33.44:5001/home.html 이렇게 들어올 수도 있다.
-
    알맞게 파싱해서 hostname, port로, path 나누어주어야 한다!
   */
 
@@ -179,6 +208,7 @@ void parse_uri(char *uri,char *hostname, char *path, int *port) {
       sscanf(parsed2+1, "%d%s", port, path);
   }
   printf("hostname=%s port=%d path=%s\n", hostname, *port, path);
+  return 1;
 }
 
 int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *hdr, char *method) {
@@ -193,7 +223,6 @@ int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *
 
   while (1) {
     if (Rio_readlineb(client_rio, buf, MAXLINE) == 0) break;
-    if (!strcmp(buf,EOL)) break;  // buf == EOL => EOF
 
     if (!strncasecmp(buf, HOST, strlen(HOST))) {
       // 호스트 헤더 지정
@@ -216,10 +245,26 @@ int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *
     host_hdr,   // Host header
     user_agent_hdr,
     connection_hdr,
-    proxy_connection_hdr,
-    EOL
+    proxy_connection_hdr
   );
   if (strlen(hdr))
     return 1;
   return 0;
 }
+
+
+/*
+ * read_requesthdrs - read and parse HTTP request headers
+ */
+/* $begin read_requesthdrs */
+void read_requesthdrs(rio_t *rp) {
+    char buf[MAXLINE];
+
+    Rio_readlineb(rp, buf, MAXLINE);
+
+    while(strcmp(buf, "\r\n")) {
+        Rio_readlineb(rp, buf, MAXLINE);
+    }
+    return;
+}
+/* $end read_requesthdrs */

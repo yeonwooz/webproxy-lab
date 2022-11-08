@@ -43,8 +43,8 @@ int main(int argc, char **argv) {
     *clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // 프록시가 서버로서 클라이언트와 맺는 파일 디스크립터(소켓 디스크립터) : 고유 식별되는 회선이자 메모리 그 자체
     Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
     printf("Connected to (%s, %s)\n", client_hostname, client_port);
-    // doit(clientfd); // 프록시가 중개를 시작
-    Pthread_create(&tid, NULL, thread, clientfd);
+    doit(*clientfd); // 프록시가 중개를 시작
+    // Pthread_create(&tid, NULL, thread, clientfd);
   }
   return 0;
 }

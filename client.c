@@ -22,6 +22,7 @@ int main(int argc, char **argv) {
 
         printf("6.[I'm client] proxy -> client\n");
         Rio_readlineb(&rio, buf, MAXLINE);              // 서버의 res 받음
+        printf("srcp=%s\n", buf);
 
         Fputs(buf, stdout);
     }

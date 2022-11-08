@@ -950,7 +950,6 @@ ssize_t Rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen)
 int open_clientfd(char *hostname, char *port) {
     int clientfd, rc;
     struct addrinfo hints, *listp, *p;
-
     /* Get a list of potential server addresses */
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_socktype = SOCK_STREAM;  /* Open a connection */

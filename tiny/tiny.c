@@ -4,7 +4,7 @@
  *     GET method to serve static and dynamic content.
  */
 #include "csapp.h"
-#include <stdlib.h>
+#include "echo.c"
 
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
@@ -33,8 +33,10 @@ int main(int argc, char **argv)
     while (1) {
       clientlen = sizeof(clientaddr);
 	    connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
+      printf("tiny server!\n");
+      // echo(connfd);
 	    doit(connfd);                                             //line:netp:tiny:doit
-	    Close(connfd);                                            //line:netp:tiny:close
+	    // Close(connfd);                                            //line:netp:tiny:close
     }
 }
 /* $end tinymain */
@@ -56,23 +58,31 @@ void doit(int fd)
     Rio_readlineb(&rio, buf, MAXLINE);                   //line:netp:doit:readrequest
     printf("Request headers:\n");
     printf("%s", buf);
-    sscanf(buf, "%s %s %s", method, uri, version);       //line:netp:doit:parserequest
+    sscanf(buf, "%s %s %s", method, uri, version);       
+
+    printf("[server]method=%s\n", method);
     if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
-        //line:netp:doit:beginrequesterr
-       clienterror(fd, method, "501", "Not Implemented",
+        printf("501 ERROR\n");
+        clienterror(fd, method, "501", "Not Implemented",
                 "Tiny does not implement this method");
         return;
-    }                                                    //line:netp:doit:endrequesterr
-    read_requesthdrs(&rio);                              //line:netp:doit:readrequesthdrs
+    }                                                 
 
+    read_requesthdrs(&rio);                            
+
+    printf("[server]starts parse\n");
     /* Parse URI from GET request */
     is_static = parse_uri(uri, filename, cgiargs);       //line:netp:doit:staticcheck
     if (stat(filename, &sbuf) < 0) {                     //line:netp:doit:beginnotfound
+      printf("404 ERROR\n");
       clienterror(fd, filename, "404", "Not found", "Tiny couldn't find this file");
 	    return;
     }                                                    //line:netp:doit:endnotfound
 
     if (is_static) { /* Serve static content */          
+    
+    printf("[server]is_static\n");
+
     if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) { //line:netp:doit:readable
         clienterror(fd, filename, "403", "Forbidden",
         "Tiny couldn't read the file");
@@ -81,6 +91,8 @@ void doit(int fd)
 	  serve_static(fd, filename, sbuf.st_size, method);        //line:netp:doit:servestatic
     }
     else { /* Serve dynamic content */
+      printf("[server]is_dynamic\n");
+
       // if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { //line:netp:doit:executable
       if (!(S_IXUSR & sbuf.st_mode)) {
 	      clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
@@ -101,6 +113,7 @@ void read_requesthdrs(rio_t *rp)
 
     Rio_readlineb(rp, buf, MAXLINE);
     while(strcmp(buf, "\r\n")) {          //line:netp:readhdrs:checkterm
+      printf("read_requesthdrs\n");
 	    Rio_readlineb(rp, buf, MAXLINE);
 	    printf("%s", buf);
     }
@@ -115,6 +128,7 @@ void read_requesthdrs(rio_t *rp)
 /* $begin parse_uri */
 int parse_uri(char *uri, char *filename, char *cgiargs) 
 {
+    printf("[server]parse_uri\n");
     char *ptr;
 
     if (!strstr(uri, "cgi-bin")) {  /* Static content */ //line:netp:parseuri:isstatic
@@ -123,6 +137,8 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 	    strcat(filename, uri);                           //line:netp:parseuri:endconvert1
 	    if (uri[strlen(uri)-1] == '/')                   //line:netp:parseuri:slashcheck
 	      strcat(filename, "form-adder.html");               //line:netp:parseuri:appenddefault  
+      
+      printf("filename=%s\n", filename);
 	    return 1;
     }
     else {  /* Dynamic content */                        //line:netp:parseuri:isdynamic
@@ -135,10 +151,6 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
         strcpy(cgiargs, "");                         //line:netp:parseuri:endextract
       strcpy(filename, ".");                           //line:netp:parseuri:beginconvert2
       strcat(filename, uri);                           //line:netp:parseuri:endconvert2
-      // strcat(filename, ".html");  
-      // ptr = index(filename, '/'); 
-      // *ptr = '\0';   
-      // strcat(filename, 'home.html');   
       return 0;
     }
 }
@@ -152,7 +164,7 @@ void serve_static(int fd, char *filename, int filesize, char* method)
 {
     int srcfd;
     char *srcp, filetype[MAXLINE], buf[MAXBUF];
- 
+    
     /* Send response headers to client */
     get_filetype(filename, filetype);       //line:netp:servestatic:getfiletype
     sprintf(buf, "HTTP/1.0 200 OK\r\n");    //line:netp:servestatic:beginserve
@@ -161,7 +173,12 @@ void serve_static(int fd, char *filename, int filesize, char* method)
     sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
     Rio_writen(fd, buf, strlen(buf));       //line:netp:servestatic:endserve
     printf("Response headers:\n");
-    printf("%s", buf);
+    printf("serve_static buffffff=>%s", buf);
+
+    if (!strcasecmp(method, "HEAD")){
+      // HEAD  메서드로 들어왔다면 스트링이 일치하여 0
+      return;
+    }
 
     if (!strcasecmp(method, "HEAD")){
       return;
@@ -173,8 +190,11 @@ void serve_static(int fd, char *filename, int filesize, char* method)
     // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);//line:netp:servestatic:mmap
     srcp = (char *)malloc(filesize);
     Rio_readn(srcfd, srcp, filesize);
-    Close(srcfd);                           //line:netp:servestatic:close
+
+    printf("3. [I'm server] server -> proxy\n");
+    printf("srcp=%s, filesize=%d\n", srcp, filesize);
     Rio_writen(fd, srcp, filesize);         //line:netp:servestatic:write
+    // Close(srcfd);                           //line:netp:servestatic:close
     // Munmap(srcp, filesize);                 //line:netp:servestatic:munmap
     free(srcp);
 }
@@ -238,6 +258,7 @@ void serve_dynamic(int fd, char *filename, char *cgiargs, char* method)
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg) 
 {
+    printf("client error\n");
     char buf[MAXLINE], body[MAXBUF];
 
     /* Build the HTTP response body */

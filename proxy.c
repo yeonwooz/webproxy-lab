@@ -7,6 +7,7 @@ void clienterror(int fd, char *cause, char *errnum,
 void parse_uri(char *uri,char *hostname,char *path,int *port);
 int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *hdr, char *method);
 void *thread(void *argptr);  // Pthread_create 에 루틴 반환형이 정의되어있음
+void sigpipe_handler(int sig);
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -36,6 +37,8 @@ int main(int argc, char **argv) {
     exit(0);
   }
 
+  Signal(SIGPIPE, sigpipe_handler);
+
   listenfd = Open_listenfd(argv[1]);  // 대기 회선
   while (1) {
     clientlen = sizeof(struct sockaddr_storage);
@@ -43,16 +46,22 @@ int main(int argc, char **argv) {
     *clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // 프록시가 서버로서 클라이언트와 맺는 파일 디스크립터(소켓 디스크립터) : 고유 식별되는 회선이자 메모리 그 자체
     Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
     printf("Connected to (%s, %s)\n", client_hostname, client_port);
-    doit(*clientfd); // 프록시가 중개를 시작
-    // Pthread_create(&tid, NULL, thread, clientfd);
+    // doit(*clientfd); // 프록시가 중개를 시작
+    Pthread_create(&tid, NULL, thread, clientfd);
   }
   return 0;
 }
 
+void sigpipe_handler(int sig) {
+    printf("SIGPIPE handled\n");
+    return;
+}
+
 void *thread(void *argptr) {
   int clientfd = *((int *)argptr);
-  Pthread_detach(pthread_self);
+  Pthread_detach((pthread_self()));
   Free(argptr);
+  Signal(SIGPIPE, sigpipe_handler);
   doit(clientfd);
   Close(clientfd);
   return NULL;

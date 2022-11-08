@@ -98,14 +98,11 @@ void doit(int client_fd) {
     server_fd = Open_clientfd(hostname, port_value); // 서버와의 소켓 디스크립터 생성
 
     Rio_readinitb(&server_rio, server_fd);  // 서버 소켓과 연결
-    printf("2.[I'm proxy] proxy -> server\n");
+
     Rio_writen(server_fd, hdr, strlen(hdr)); // 서버에 req 보냄
 
     size_t n;
-    while ((n=Rio_readlineb(&server_rio, buf, MAXLINE)) !=0) {
-      printf("4.[I'm proxy] server -> proxy\n");  // (while 조건) 서버에서 응답 받음
-
-      printf("5.[I'm proxy] proxy -> client\n");
+    while ((n=Rio_readlineb(&server_rio, buf, MAXLINE)) > 0) {
       Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
     }
     Close(server_fd);
@@ -194,7 +191,8 @@ int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *
   char *P_CONN = "Proxy-Connection";
   sprintf(req_hdr, request_hdr_format, method, path); // method url version
 
-  while (Rio_readlineb(client_rio, buf, MAXLINE) > 0) {
+  while (1) {
+    if (Rio_readlineb(client_rio, buf, MAXLINE) == 0) break;
     if (!strcmp(buf,EOL)) break;  // buf == EOL => EOF
 
     if (!strncasecmp(buf, HOST, strlen(HOST))) {
@@ -204,7 +202,7 @@ int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *
     }
 
     if (strncasecmp(buf, CONN, strlen(CONN)) && strncasecmp(buf, UA, strlen(UA)) && strncasecmp(buf, P_CONN, strlen(P_CONN))) {
-      // 미리 준비된 헤더가 아니면 추가 헤더에 추가 
+       // 미리 준비된 헤더가 아니면 추가 헤더에 추가 
       strcat(additional_hdf, buf);  
     }
   }
@@ -213,11 +211,10 @@ int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *
     sprintf(host_hdr, host_hdr_format, hostname);
   }
 
-  sprintf(hdr, "%s%s%s%s%s%s%s", 
+  sprintf(hdr, "%s%s%s%s%s%s", 
     req_hdr,   // METHOD URL VERSION
     host_hdr,   // Host header
     user_agent_hdr,
-    Accept_hdr,
     connection_hdr,
     proxy_connection_hdr,
     EOL

@@ -6,6 +6,7 @@ void clienterror(int fd, char *cause, char *errnum,
 		 char *shortmsg, char *longmsg);
 void parse_uri(char *uri,char *hostname,char *path,int *port);
 int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *hdr, char *method);
+void *thread(void *argptr);  // Pthread_create 에 루틴 반환형이 정의되어있음
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -24,10 +25,11 @@ static const char *Accept_hdr = "    Accept: text/html,application/xhtml+xml,app
 static const char *EOL = "\r\n";
 
 int main(int argc, char **argv) {
-  int listenfd, connfd;
+  int listenfd, *clientfd;
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
   char client_hostname[MAXLINE], client_port[MAXLINE]; // 프록시가 요청을 받고 응답해줄 클라이언트의 IP, Port
+  pthread_t tid;  // 스레드에 부여할 tid 번호 (unsigned long)
 
   if (argc != 2) {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
@@ -37,13 +39,23 @@ int main(int argc, char **argv) {
   listenfd = Open_listenfd(argv[1]);  // 대기 회선
   while (1) {
     clientlen = sizeof(struct sockaddr_storage);
-    connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // 프록시가 서버로서 클라이언트와 맺는 파일 디스크립터(소켓 디스크립터) : 고유 식별되는 회선이자 메모리 그 자체
+    clientfd = (int *)Malloc(sizeof(int));   // 여러개의 디스크립터를 만들 것이므로 덮어쓰지 못하도록 고유메모리에 할당
+    *clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // 프록시가 서버로서 클라이언트와 맺는 파일 디스크립터(소켓 디스크립터) : 고유 식별되는 회선이자 메모리 그 자체
     Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
     printf("Connected to (%s, %s)\n", client_hostname, client_port);
-    doit(connfd); // 프록시가 중개를 시작
-    Close(connfd);
+    // doit(clientfd); // 프록시가 중개를 시작
+    Pthread_create(&tid, NULL, thread, clientfd);
   }
   return 0;
+}
+
+void *thread(void *argptr) {
+  int clientfd = *((int *)argptr);
+  Pthread_detach(pthread_self);
+  Free(argptr);
+  doit(clientfd);
+  Close(clientfd);
+  return NULL;
 }
 
 void doit(int client_fd) {

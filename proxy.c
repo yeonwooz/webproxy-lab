@@ -77,7 +77,10 @@ void doit(int client_fd) {
               "Request header is wrong");      
     }
     
-    server_fd = Open_clientfd(hostname, port);  // 서버와의 소켓 디스크립터 생성
+    char port_value[100];
+    sprintf(port_value,"%d",port);
+    server_fd = Open_clientfd(hostname, port_value); // 서버와의 소켓 디스크립터 생성
+
     Rio_readinitb(&server_rio, server_fd);  // 서버 소켓과 연결
     printf("2.[I'm proxy] proxy -> server\n");
     Rio_writen(server_fd, hdr, strlen(hdr)); // 서버에 req 보냄
@@ -88,7 +91,6 @@ void doit(int client_fd) {
 
       printf("5.[I'm proxy] proxy -> client\n");
       Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
-      Close(client_fd);
     }
     Close(server_fd);
 }
@@ -163,7 +165,7 @@ void parse_uri(char *uri,char *hostname, char *path, int *port) {
       sscanf(parsed, "%s", hostname);
       sscanf(parsed2+1, "%d%s", port, path);
   }
-  printf("hostname=%s port=%d path=%s\n", hostname, port, path);
+  printf("hostname=%s port=%d path=%s\n", hostname, *port, path);
 }
 
 int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *hdr, char *method) {

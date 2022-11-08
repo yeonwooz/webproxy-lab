@@ -83,6 +83,7 @@ void doit(int client_fd) {
     } 
 
     parse_uri(uri, hostname, path, &port); // req uri 파싱하여 hostname, path, port(포인터) 변수에 할당
+    printf("[out]hostname=%s port=%d path=%s\n", hostname, port, path);
 
     if (!make_request(&client_rio, hostname, path, port, hdr, method)) {
       clienterror(client_fd, method, "501", "request header error",
@@ -149,7 +150,7 @@ void parse_uri(char *uri,char *hostname, char *path, int *port) {
   
   char *parsed;
   parsed = strstr(uri, "//");
-
+  
   if (parsed == NULL) {
     parsed = uri;
   }
@@ -166,7 +167,9 @@ void parse_uri(char *uri,char *hostname, char *path, int *port) {
     } 
     else {
         *parsed2 = '\0';
-        sscanf(parsed,"%s",hostname);
+        // sscanf(parsed,"%s",hostname);
+        strcpy(hostname,"43.201.51.191" );
+        *port = 8000;
         *parsed2 = '/';
         sscanf(parsed2,"%s",path);
     }

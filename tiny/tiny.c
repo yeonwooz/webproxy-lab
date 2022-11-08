@@ -134,7 +134,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 	    strcpy(filename, ".");                           //line:netp:parseuri:beginconvert1
 	    strcat(filename, uri);                           //line:netp:parseuri:endconvert1
 	    if (uri[strlen(uri)-1] == '/')                   //line:netp:parseuri:slashcheck
-	      strcat(filename, "form-adder.html");               //line:netp:parseuri:appenddefault  
+	      strcat(filename, "home.html");               //line:netp:parseuri:appenddefault  
       
       printf("filename=%s\n", filename);
 	    return 1;

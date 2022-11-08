@@ -34,7 +34,8 @@ int main(int argc, char **argv)
       clientlen = sizeof(clientaddr);
 	    connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
       printf("tiny server!\n");
-	    doit(connfd);                                     
+	    doit(connfd);  
+      Close(connfd);                                   
     }
 }
 /* $end tinymain */

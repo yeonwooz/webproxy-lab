@@ -1,7 +1,12 @@
 #include "csapp.h"
 #include "echo.c"
 
-void doit(int connfd);
+struct ARGS {
+  int connfd;
+  char hostname[MAXLINE], port[MAXLINE];
+}; 
+
+void doit(struct ARGS *args);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
 void parse_uri(char *uri,char *hostname,char *path,int *port);
@@ -58,35 +63,39 @@ void sigpipe_handler(int sig) {
 }
 
 void *thread(void *argptr) {
-  int clientfd = *((int *)argptr);
+  struct ARGS cur_arg;
+  cur_arg = *((struct ARGS *) argptr);
   Pthread_detach((pthread_self()));
   Free(argptr);
-  Signal(SIGPIPE, sigpipe_handler);
-  doit(clientfd);
-  Close(clientfd);
+  // Signal(SIGPIPE, sigpipe_handler);
+  doit(&cur_arg);
+  Close(cur_arg.connfd);
   return NULL;
 }
 
-void doit(int client_fd) {
+void doit(struct ARGS *args) {
+  int is_static;
+    struct stat sbuf;
     char hostname[MAXLINE], path[MAXLINE];  // 프록시가 요청을 보낼 서버의 hostname, 파일경로
     int port;
     
     char buf[MAXLINE], hdr[MAXLINE];
     char method[MAXLINE], uri[MAXLINE], version[MAXLINE];
-
+    struct ARGS cur_arg;
+    cur_arg = *((struct ARGS *) args);
     int server_fd;
 
     rio_t client_rio;     // 클라이언트와의 rio
     rio_t server_rio;     // 서버와의 rio
 
-    Rio_readinitb(&client_rio, client_fd);  // 클라이언트와 connection 시작
+    Rio_readinitb(&client_rio, cur_arg.connfd);  // 클라이언트와 connection 시작
     Rio_readlineb(&client_rio, buf, MAXLINE);  // 클라이언트의 요청(한줄) 받음 
     sscanf(buf, "%s %s %s", method, uri, version);       // 클라이언트에서 받은 요청 파싱(method, uri, version 뽑아냄)
 
     if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
       // 501 요청은 프록시 선에서 처리 
         printf("[PROXY]501 ERROR\n");
-        clienterror(client_fd, method, "501", "Not Implemented",
+        clienterror(cur_arg.connfd, method, "501", "Not Implemented",
                 "Tiny does not implement this method");
         return;
     } 
@@ -94,11 +103,11 @@ void doit(int client_fd) {
     parse_uri(uri, hostname, path, &port); // req uri 파싱하여 hostname, path, port(포인터) 변수에 할당
     printf("[out]hostname=%s port=%d path=%s\n", hostname, port, path);
     if (!strlen(hostname)) {
-      clienterror(client_fd, method, "501", "No Hostname",
+      clienterror(cur_arg.connfd, method, "501", "No Hostname",
                 "Hostname is necessary");
     }
     if (!make_request(&client_rio, hostname, path, port, hdr, method)) {
-      clienterror(client_fd, method, "501", "request header error",
+      clienterror(cur_arg.connfd, method, "501", "request header error",
               "Request header is wrong");      
     }
     
@@ -112,9 +121,9 @@ void doit(int client_fd) {
 
     size_t n;
     while ((n=Rio_readlineb(&server_rio, buf, MAXLINE)) > 0) {
-      Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
+      Rio_writen(cur_arg.connfd, buf, n);   // 클라이언트에게 응답 전달
     }
-    Close(server_fd);
+    // Close(server_fd);
 }
 
 /*

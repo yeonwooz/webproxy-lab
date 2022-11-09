@@ -7,6 +7,72 @@
 #define VERBOSE 1
 #define CONCURRENCY 2 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
 
+// struct cache_store {
+//   // char hostname[MAXLINE];
+//   // char port[MAXLINE];
+//   // char path[MAXLINE];
+//   char url[MAXLINE];  // 같은 url에 대한 요청인지 strcmp로 비교 예정
+//   char storage[MAX_CACHE_SIZE];
+// };
+
+
+/* 해시테이블  https://stackoverflow.com/questions/21850356/error-conflicting-types-for-strdup */
+struct nlist { /* table entry: */
+    struct nlist *next; /* next entry in chain */
+    char *name; /* defined name */
+    char *defn; /* replacement text */
+};
+
+#define HASHSIZE MAX_CACHE_SIZE
+static struct nlist *hashtab[HASHSIZE]; /* pointer table */
+
+/* hash: form hash value for string s */
+unsigned hash(char *s)
+{
+    unsigned hashval;
+    for (hashval = 0; *s != '\0'; s++)
+      hashval = *s + 31 * hashval;
+    return hashval % HASHSIZE;
+}
+
+/* lookup: look for s in hashtab */
+struct nlist *lookup(char *s)
+{
+    struct nlist *np;
+    for (np = hashtab[hash(s)]; np != NULL; np = np->next)
+        if (strcmp(s, np->name) == 0)
+          return np; /* found */
+    return NULL; /* not found */
+}
+
+char *hashstrdup(char *s);  // strdup 라는 이름은 사용할 수 없음(string.h에 이미 정의됨)
+/* install: put (name, defn) in hashtab */
+struct nlist *install(char *name, char *defn)
+{
+    struct nlist *np;
+    unsigned hashval;
+    if ((np = lookup(name)) == NULL) { /* not found */
+        np = (struct nlist *) malloc(sizeof(*np));
+        if (np == NULL || (np->name = hashstrdup(name)) == NULL)
+          return NULL;
+        hashval = hash(name);
+        np->next = hashtab[hashval];
+        hashtab[hashval] = np;
+    } else /* already there */
+        free((void *) np->defn); /*free previous defn */
+    if ((np->defn = hashstrdup(defn)) == NULL)
+       return NULL;
+    return np;
+}
+
+char *hashstrdup(char *s) /* make a duplicate of s */
+{
+    char *p;
+    p = (char *) malloc(strlen(s)+1); /* +1 for ’\0’ */
+    if (p != NULL)
+       strcpy(p, s);
+    return p;
+}
 
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
@@ -52,7 +118,6 @@ int main(int argc, char **argv) {
 
     Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
     
-
   #if CONCURRENCY == 0
       doit(*clientfd);
       Close(*clientfd);
@@ -123,6 +188,13 @@ void doit(int client_fd) {
       clienterror(client_fd, method, "501", "잘못된 요청",
                 "501 에러. 올바른 요청이 아닙니다.");
     }
+
+    // char cached[MAX_CACHE_SIZE];
+    // strcpy(cached, lookup(*uri));
+    // if (cached) {
+    //   Rio_writen(client_fd, cached, strlen(cached)); 
+    //   return;
+    // }
     
     char port_value[100];
     sprintf(port_value,"%d",port);
@@ -132,8 +204,12 @@ void doit(int client_fd) {
     Rio_writen(server_fd, hdr, strlen(hdr)); // 서버에 req 보냄
 
     size_t n;
-    while ((n=Rio_readnb(&server_rio, buf, MAXLINE)) > 0) {
+    while (1) {
+      n=Rio_readnb(&server_rio, buf, MAXLINE);
+      if (n == 0)  break;
+
       Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
+      install(uri, buf);
     }
     Close(server_fd);
 }

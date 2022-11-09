@@ -7,7 +7,6 @@ void clienterror(int fd, char *cause, char *errnum,
 void parse_uri(char *uri,char *hostname,char *path,int *port);
 int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *hdr, char *method);
 void *thread(void *vargp);  // Pthread_create 에 루틴 반환형이 정의되어있음
-void sigpipe_handler(int sig);
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -37,7 +36,6 @@ int main(int argc, char **argv) {
     exit(0);
   }
 
-  Signal(SIGPIPE, sigpipe_handler);
 
   listenfd = Open_listenfd(argv[1]);  // 대기 회선
   while (1) {
@@ -52,16 +50,10 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-void sigpipe_handler(int sig) {
-    printf("SIGPIPE handled\n");
-    return;
-}
-
 void *thread(void *argptr) {
   int clientfd = *((int *)argptr);
   Pthread_detach((pthread_self()));
   Free(argptr);
-  Signal(SIGPIPE, sigpipe_handler);
   doit(clientfd);
   Close(clientfd);
   return NULL;

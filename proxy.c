@@ -1,18 +1,22 @@
 #include "csapp.h"
 #include "echo.c"
 
+/* Recommended max cache and object sizes */
+#define MAX_CACHE_SIZE 1049000
+#define MAX_OBJECT_SIZE 102400
+#define VERBOSE 0
+#define CONCURRENCY 2 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
+
+
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
 void parse_uri(char *uri,char *hostname,char *path,int *port);
 int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *hdr, char *method);
+#if CONCURRENCY == 1 
 void *thread(void *vargp);  // Pthread_create 에 루틴 반환형이 정의되어있음
+#endif
 
-/* Recommended max cache and object sizes */
-#define MAX_CACHE_SIZE 1049000
-#define MAX_OBJECT_SIZE 102400
-#define VERBOSE
-#
 /* You won't lose style points for including this long line in your code */
 // https://developer.mozilla.org/ko/docs/Glossary/Request_header
 static const char *request_hdr_format = "%s %s HTTP/1.0\r\n";
@@ -37,16 +41,26 @@ int main(int argc, char **argv) {
     exit(0);
   }
 
-
   listenfd = Open_listenfd(argv[1]);  // 대기 회선
   while (1) {
     clientlen = sizeof(struct sockaddr_storage);
     clientfd = (int *)Malloc(sizeof(int));   // 여러개의 디스크립터를 만들 것이므로 덮어쓰지 못하도록 고유메모리에 할당
     *clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // 프록시가 서버로서 클라이언트와 맺는 파일 디스크립터(소켓 디스크립터) : 고유 식별되는 회선이자 메모리 그 자체
+    if (VERBOSE) {
+      printf("Connected to (%s, %s)\n", client_hostname, client_port);
+    }
+
     Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
-    printf("Connected to (%s, %s)\n", client_hostname, client_port);
-    // doit(*clientfd); // 프록시가 중개를 시작
-    // Pthread_create(&tid, NULL, thread, clientfd);
+    
+
+  #if CONCURRENCY == 0
+      doit(*clientfd);
+      Close(*clientfd);
+  
+  #elif CONCURRENCY == 1
+      Pthread_create(&tid, NULL, thread, clientfd);
+  
+  #elif CONCURRENCY == 2 
     if (Fork() == 0) {
       Close(listenfd);
       doit(*clientfd);
@@ -54,18 +68,21 @@ int main(int argc, char **argv) {
       exit(0);
     }
     Close(*clientfd);
+  #endif
   }
   return 0;
 }
 
-void *thread(void *argptr) {
-  int clientfd = *((int *)argptr);
-  Pthread_detach((pthread_self()));
-  Free(argptr);
-  doit(clientfd);
-  Close(clientfd);
-  return NULL;
-}
+#if CONCURRENCY == 1 
+  void *thread(void *argptr) {
+    int clientfd = *((int *)argptr);
+    Pthread_detach((pthread_self()));
+    Free(argptr);
+    doit(clientfd);
+    Close(clientfd);
+    return NULL;
+  }
+#endif
 
 void doit(int client_fd) {
     char hostname[MAXLINE], path[MAXLINE];  // 프록시가 요청을 보낼 서버의 hostname, 파일경로

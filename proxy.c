@@ -45,7 +45,14 @@ int main(int argc, char **argv) {
     Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
     printf("Connected to (%s, %s)\n", client_hostname, client_port);
     // doit(*clientfd); // 프록시가 중개를 시작
-    Pthread_create(&tid, NULL, thread, clientfd);
+    // Pthread_create(&tid, NULL, thread, clientfd);
+    if (Fork() == 0) {
+      Close(listenfd);
+      doit(*clientfd);
+      Close(*clientfd);
+      exit(0);
+    }
+    Close(*clientfd);
   }
   return 0;
 }

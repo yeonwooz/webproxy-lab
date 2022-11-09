@@ -46,12 +46,12 @@ int main(int argc, char **argv) {
     clientlen = sizeof(struct sockaddr_storage);
     clientfd = (int *)Malloc(sizeof(int));   // 여러개의 디스크립터를 만들 것이므로 덮어쓰지 못하도록 고유메모리에 할당
     *clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // 프록시가 서버로서 클라이언트와 맺는 파일 디스크립터(소켓 디스크립터) : 고유 식별되는 회선이자 메모리 그 자체
-    if (VERBOSE) {
-      printf("Connected to (%s, %s)\n", client_hostname, client_port);
-    }
 
     Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
     
+    if (VERBOSE) {
+      printf("Connected to (%s, %s)\n", client_hostname, client_port);
+    }
 
   #if CONCURRENCY == 0
       doit(*clientfd);
@@ -111,15 +111,21 @@ void doit(int client_fd) {
     } 
 
     parse_uri(uri, hostname, path, &port); // req uri 파싱하여 hostname, path, port(포인터) 변수에 할당
+    
     if (VERBOSE) {
-      printf("[PROXY]501 ERROR\n");
       printf("[out]hostname=%s port=%d path=%s\n", hostname, port, path);
     }
     if (!strlen(hostname)) {
+      if (VERBOSE) {
+        printf("[PROXY]501 ERROR\n");
+      }
       clienterror(client_fd, method, "501", "잘못된 요청",
                 "501 에러. 올바른 요청이 아닙니다.");
     }
     if (!make_request(&client_rio, hostname, path, port, hdr, method)) {
+      if (VERBOSE) {
+        printf("[PROXY]501 ERROR\n");
+      }
       clienterror(client_fd, method, "501", "잘못된 요청",
                 "501 에러. 올바른 요청이 아닙니다.");
     }

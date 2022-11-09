@@ -8,7 +8,7 @@
 #define MAX_OBJECT_SIZE 102400
 #define VERBOSE         1
 #define CONCURRENCY     2 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
-#define CACHE_ENABLE    0
+#define CACHE_ENABLE    1
 
 // struct cache_store {
 //   // char hostname[MAXLINE];
@@ -137,14 +137,6 @@ void doit(int client_fd) {
       clienterror(client_fd, method, "501", "잘못된 요청",
                 "501 에러. 올바른 요청이 아닙니다.");
     }
-    if (!make_request(&client_rio, hostname, path, port, hdr, method)) {
-      if (VERBOSE) {
-        printf("[PROXY]501 ERROR\n");
-      }
-      clienterror(client_fd, method, "501", "잘못된 요청",
-                "501 에러. 올바른 요청이 아닙니다.");
-    }
-
 
     if (CACHE_ENABLE) {
         /* Critcal readcnt section begin */
@@ -206,38 +198,60 @@ void doit(int client_fd) {
     sprintf(port_value,"%d",port);
     server_fd = Open_clientfd(hostname, port_value); // 서버와의 소켓 디스크립터 생성
 
+    if (!make_request(&client_rio, hostname, path, port, hdr, method)) {
+      if (VERBOSE) {
+        printf("[PROXY]501 ERROR\n");
+      }
+      clienterror(client_fd, method, "501", "잘못된 요청",
+                "501 에러. 올바른 요청이 아닙니다.");
+    }
+    
     Rio_readinitb(&server_rio, server_fd);  // 서버 소켓과 연결
     Rio_writen(server_fd, hdr, strlen(hdr)); // 서버에 req 보냄
 
+    strcpy(payload, "");
     size_t n;
-    while ((n=Rio_readnb(&server_rio, buf, MAXLINE)) > 0) {
-      printf("sending buf = %s\n", buf);
-      insert(uri, buf);
-      Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
-    }
+    while ((n = Rio_readnb(&server_rio, buf, MAXLINE)) != 0) {
 
-        if (CACHE_ENABLE) {
-        if (sum <= MAX_OBJECT_SIZE) {
-            node = new(hostname, port, path, payload, sum);
+        //printf("Fd = %d, Sum = %d, n = %d\n", mio_internet.mio_fd, sum, n);
+        sum += n;
+        if (sum <= MAX_OBJECT_SIZE)
+            strcat(payload, buf);
+		Rio_writen(client_fd, buf, n);
+	}
 
-            /* Critcal write section begin */
-            P(&w);
-            Cache_check();            
-            while (cache_load + sum > MAX_CACHE_SIZE) {
-                printf("!!!!!!!!!!!!!!!!!Cache evicted!!!!!!!!!!!!!!!!!!\n");
-                dequeue();
-            }
-            enqueue(node);
-            printf("The object has been cached\n");
-            printf("Current cache size is %d \n", cache_count);            
-            printf("Current cache load is %d bytes\n", cache_load);
-            //fprintf(stdout, payload);
-            Cache_check();
-            V(&w);
-            /* Critcal write section end */
+    printf("Forward respond %d bytes\n", sum);
+
+
+
+    // size_t n;
+    // while ((n=Rio_readnb(&server_rio, buf, MAXLINE)) > 0) {
+    //   printf("sending buf = %s\n", buf);
+    //   insert(uri, buf);
+    //   Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
+    // }
+
+    if (CACHE_ENABLE) {
+    if (sum <= MAX_OBJECT_SIZE) {
+        node = new(hostname, port, path, payload, sum);
+
+        /* Critcal write section begin */
+        P(&w);
+        Cache_check();            
+        while (cache_load + sum > MAX_CACHE_SIZE) {
+            printf("!!!!!!!!!!!!!!!!!Cache evicted!!!!!!!!!!!!!!!!!!\n");
+            dequeue();
         }
+        enqueue(node);
+        printf("The object has been cached\n");
+        printf("Current cache size is %d \n", cache_count);            
+        printf("Current cache load is %d bytes\n", cache_load);
+        //fprintf(stdout, payload);
+        Cache_check();
+        V(&w);
+        /* Critcal write section end */
     }
-    
+  }  
 }
 
 /*

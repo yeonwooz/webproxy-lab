@@ -1,12 +1,11 @@
 #include "csapp.h"
-#include "echo.c"
+#include "hash.c"
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
-#define VERBOSE 1
-#define CONCURRENCY 2 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
-
+#define VERBOSE         1
+#define CONCURRENCY     2 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
 
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
@@ -85,9 +84,10 @@ int main(int argc, char **argv) {
 #endif
 
 void doit(int client_fd) {
+    printf("cache_cnt=%d\n", cache_cnt);
     char hostname[MAXLINE], path[MAXLINE];  // 프록시가 요청을 보낼 서버의 hostname, 파일경로
     int port;
-    
+  
     char buf[MAXLINE], hdr[MAXLINE];
     char method[MAXLINE], uri[MAXLINE], version[MAXLINE];
 
@@ -122,6 +122,26 @@ void doit(int client_fd) {
       clienterror(client_fd, method, "501", "잘못된 요청",
                 "501 에러. 올바른 요청이 아닙니다.");
     }
+
+    struct nlist *cached = malloc(sizeof (struct nlist));
+    cached = find(uri);
+    if (cached) {
+      if (VERBOSE) {
+        printf("====================cache hit======================\n");
+        printf("\n\nname=%s\n", cached->name);
+        printf("\n\ndefn=%s\n", cached->defn);
+      }
+      Rio_writen(client_fd, cached->defn, strlen(cached->defn)); 
+      return;
+    }
+    if (VERBOSE) {
+      printf("====================cache miss======================\n");
+    }
+
+    char port_value[100];
+    sprintf(port_value,"%d",port);
+    server_fd = Open_clientfd(hostname, port_value); // 서버와의 소켓 디스크립터 생성
+
     if (!make_request(&client_rio, hostname, path, port, hdr, method)) {
       if (VERBOSE) {
         printf("[PROXY]501 ERROR\n");
@@ -130,17 +150,14 @@ void doit(int client_fd) {
                 "501 에러. 올바른 요청이 아닙니다.");
     }
     
-    char port_value[100];
-    sprintf(port_value,"%d",port);
-    server_fd = Open_clientfd(hostname, port_value); // 서버와의 소켓 디스크립터 생성
-
     Rio_readinitb(&server_rio, server_fd);  // 서버 소켓과 연결
     Rio_writen(server_fd, hdr, strlen(hdr)); // 서버에 req 보냄
 
     size_t n;
     while ((n=Rio_readnb(&server_rio, buf, MAXLINE)) > 0) {
+      insert(uri, buf);
       Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
-    }
+    } 
     Close(server_fd);
 }
 

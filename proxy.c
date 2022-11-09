@@ -15,6 +15,7 @@
 //   char storage[MAX_CACHE_SIZE];
 // };
 
+int found = 0;
 
 /* 해시테이블  https://stackoverflow.com/questions/21850356/error-conflicting-types-for-strdup */
 struct nlist { /* table entry: */
@@ -38,6 +39,7 @@ unsigned hash(char *s)
 /* lookup: look for s in hashtab */
 struct nlist *lookup(char *s)
 {
+    printf("looking for %s\n", s);
     struct nlist *np;
     for (np = hashtab[hash(s)]; np != NULL; np = np->next)
         if (strcmp(s, np->name) == 0)
@@ -196,15 +198,23 @@ void doit(int client_fd) {
                 "501 에러. 올바른 요청이 아닙니다.");
     }
 
+
     printf("caching!!!\n");
-    char cached[MAX_CACHE_SIZE];
-    // strcpy(cached, lookup(uri));
-    printf("%s\n", cached);
-    // if (cached) {
-    //   Rio_writen(client_fd, cached, strlen(cached)); 
-    //   return;
-    // }
-    printf("caching done!!!\n");
+      //  char url[100] = "abc";
+    // char value[100] ="1111";
+    
+    // install(url, value);
+    struct nlist *cached = malloc(sizeof (struct nlist));
+    // cached->name = malloc(sizeof(char *))
+    // cached->defn = malloc(sizeof(char *))
+
+    cached = lookup(uri);
+    if (cached) {
+      printf("\n\nname=%s\n", cached->name);
+      printf("\n\ndefn=%s\n", cached->defn);
+    }
+
+    printf("\ndone\n");
 
     char port_value[100];
     sprintf(port_value,"%d",port);
@@ -215,6 +225,7 @@ void doit(int client_fd) {
 
     size_t n;
     while ((n=Rio_readnb(&server_rio, buf, MAXLINE)) > 0) {
+      printf("sending buf = %s\n", buf);
       install(uri, buf);
       Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
     }

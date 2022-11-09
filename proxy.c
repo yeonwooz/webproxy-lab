@@ -190,7 +190,7 @@ void parse_uri(char *uri,char *hostname, char *path, int *port) {
 
 int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *hdr, char *method) {
   // 프록시서버로 들어온 요청을 서버에 전달하기 위해 HTTP 헤더 생성
-  char req_hdr[MAXLINE], additional_hdf[MAXLINE], host_hdr[MAXLINE];
+  char req_hdr[MAXLINE], additional_hdr[MAXLINE], host_hdr[MAXLINE];
   char buf[MAXLINE];
   char *HOST = "Host";
   char *CONN = "Connection";
@@ -210,7 +210,8 @@ int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *
 
     if (strncasecmp(buf, CONN, strlen(CONN)) && strncasecmp(buf, UA, strlen(UA)) && strncasecmp(buf, P_CONN, strlen(P_CONN))) {
        // 미리 준비된 헤더가 아니면 추가 헤더에 추가 
-      strcat(additional_hdf, buf);  
+      strcat(additional_hdr, buf);  
+      strcat(additional_hdr, "\r\n");  
     }
   }
 

@@ -169,7 +169,6 @@ void doit(int client_fd) {
       install(uri, buf);
       Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
     }
-    Close(server_fd);
 }
 
 /*

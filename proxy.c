@@ -103,7 +103,7 @@ void doit(int client_fd) {
     Rio_writen(server_fd, hdr, strlen(hdr)); // 서버에 req 보냄
 
     size_t n;
-    while ((n=Rio_readlineb(&server_rio, buf, MAXLINE)) > 0) {
+    while ((n=Rio_readnb(&server_rio, buf, MAXLINE)) > 0) {
       Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
     }
     Close(server_fd);

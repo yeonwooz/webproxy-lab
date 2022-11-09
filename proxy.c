@@ -4,7 +4,7 @@
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
-#define VERBOSE 0
+#define VERBOSE 1
 #define CONCURRENCY 2 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
 
 
@@ -102,21 +102,26 @@ void doit(int client_fd) {
 
     if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
       // 501 요청은 프록시 선에서 처리 
-        printf("[PROXY]501 ERROR\n");
-        clienterror(client_fd, method, "501", "Not Implemented",
-                "Tiny does not implement this method");
+        if (VERBOSE) {
+          printf("[PROXY]501 ERROR\n");
+        }
+        clienterror(client_fd, method, "501", "잘못된 요청",
+                "501 에러. 올바른 요청이 아닙니다.");
         return;
     } 
 
     parse_uri(uri, hostname, path, &port); // req uri 파싱하여 hostname, path, port(포인터) 변수에 할당
-    printf("[out]hostname=%s port=%d path=%s\n", hostname, port, path);
+    if (VERBOSE) {
+      printf("[PROXY]501 ERROR\n");
+      printf("[out]hostname=%s port=%d path=%s\n", hostname, port, path);
+    }
     if (!strlen(hostname)) {
-      clienterror(client_fd, method, "501", "No Hostname",
-                "Hostname is necessary");
+      clienterror(client_fd, method, "501", "잘못된 요청",
+                "501 에러. 올바른 요청이 아닙니다.");
     }
     if (!make_request(&client_rio, hostname, path, port, hdr, method)) {
-      clienterror(client_fd, method, "501", "request header error",
-              "Request header is wrong");      
+      clienterror(client_fd, method, "501", "잘못된 요청",
+                "501 에러. 올바른 요청이 아닙니다.");
     }
     
     char port_value[100];
@@ -124,7 +129,6 @@ void doit(int client_fd) {
     server_fd = Open_clientfd(hostname, port_value); // 서버와의 소켓 디스크립터 생성
 
     Rio_readinitb(&server_rio, server_fd);  // 서버 소켓과 연결
-
     Rio_writen(server_fd, hdr, strlen(hdr)); // 서버에 req 보냄
 
     size_t n;
@@ -170,8 +174,9 @@ void parse_uri(char *uri,char *hostname, char *path, int *port) {
   */
 
   *port = 80;
-
-  printf("uri=%s\n", uri);
+  if (VERBOSE) {
+    printf("uri=%s\n", uri);
+  }
   
   char *parsed;
   parsed = strstr(uri, "//");
@@ -191,7 +196,6 @@ void parse_uri(char *uri,char *hostname, char *path, int *port) {
       sscanf(parsed,"%s",hostname);
     } 
     else {
-        printf("parsed=%s parsed2=%s\n", parsed, parsed2);
         *parsed2 = '\0';
         sscanf(parsed,"%s",hostname);
         *parsed2 = '/';
@@ -203,7 +207,9 @@ void parse_uri(char *uri,char *hostname, char *path, int *port) {
       sscanf(parsed, "%s", hostname);
       sscanf(parsed2+1, "%d%s", port, path);
   }
-  printf("hostname=%s port=%d path=%s\n", hostname, *port, path);
+  if (VERBOSE) {
+    printf("hostname=%s port=%d path=%s\n", hostname, *port, path);
+  }
 }
 
 int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *hdr, char *method) {

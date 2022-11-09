@@ -5,7 +5,7 @@
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
 #define VERBOSE         1
-#define CONCURRENCY     2 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
+#define CONCURRENCY     0 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
 
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
@@ -123,20 +123,21 @@ void doit(int client_fd) {
                 "501 에러. 올바른 요청이 아닙니다.");
     }
 
-    struct nlist *cached = malloc(sizeof (struct nlist));
-    cached = find(uri);
-    if (cached) {
-      if (VERBOSE) {
-        printf("====================cache hit======================\n");
-        printf("\n\nname=%s\n", cached->name);
-        printf("\n\ndefn=%s\n", cached->defn);
-      }
-      Rio_writen(client_fd, cached->defn, strlen(cached->defn)); 
-      return;
-    }
-    if (VERBOSE) {
-      printf("====================cache miss======================\n");
-    }
+    //=====캐싱========//
+    // struct nlist *cached = malloc(sizeof (struct nlist));
+    // cached = find(uri);
+    // if (cached) {
+    //   if (VERBOSE) {
+    //     printf("====================cache hit======================\n");
+    //     printf("\n\nname=%s\n", cached->name);
+    //     printf("\n\ndefn=%s\n", cached->defn);
+    //   }
+    //   Rio_writen(client_fd, cached->defn, strlen(cached->defn)); 
+    //   return;
+    // }
+    // if (VERBOSE) {
+    //   printf("====================cache miss======================\n");
+    // }
 
     char port_value[100];
     sprintf(port_value,"%d",port);

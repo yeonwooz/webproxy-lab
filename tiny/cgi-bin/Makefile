@@ -3,8 +3,8 @@ CFLAGS = -O2 -Wall -I ..
 
 all: adder
 
-adder: form-adder.c
-	$(CC) $(CFLAGS) -o form-adder form-adder.c
+adder: adder.c
+	$(CC) $(CFLAGS) -o adder adder.c
 
 clean:
-	rm -f form-adder *~
+	rm -f adder *~

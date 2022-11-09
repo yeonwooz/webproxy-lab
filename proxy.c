@@ -5,7 +5,7 @@
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
 #define VERBOSE         1
-#define CONCURRENCY     0 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
+#define CONCURRENCY     2 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
 
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 

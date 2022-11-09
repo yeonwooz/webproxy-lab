@@ -1,9 +1,9 @@
 #include "csapp.h"
 
 unsigned hash(char *s);
-struct nlist *lookup(char *s);
+struct nlist *find(char *s);
 char *hashstrdup(char *s);  // strdup 라는 이름은 사용할 수 없음(string.h에 이미 정의됨)
-struct nlist *install(char *name, char *defn);
+struct nlist *insert(char *name, char *defn);
 
 
 /* 해시테이블  https://stackoverflow.com/questions/21850356/error-conflicting-types-for-strdup */
@@ -25,8 +25,8 @@ unsigned hash(char *s)
     return hashval % HASHSIZE;
 }
 
-/* lookup: look for s in hashtab */
-struct nlist *lookup(char *s)
+/* find: look for s in hashtab */
+struct nlist *find(char *s)
 {
     printf("looking for %s\n", s);
     struct nlist *np;
@@ -36,20 +36,21 @@ struct nlist *lookup(char *s)
     return NULL; /* not found */
 }
 
-/* install: put (name, defn) in hashtab */
-struct nlist *install(char *name, char *defn)
+/* insert: put (name, defn) in hashtab */
+struct nlist *insert(char *name, char *defn)
 {
     struct nlist *np;
     unsigned hashval;
-    if ((np = lookup(name)) == NULL) { /* not found */
+    if ((np = find(name)) == NULL) { /* not found */
         np = (struct nlist *) malloc(sizeof(*np));
         if (np == NULL || (np->name = hashstrdup(name)) == NULL)
           return NULL;
         hashval = hash(name);
         np->next = hashtab[hashval];
         hashtab[hashval] = np;
-    } else /* already there */
-        free((void *) np->defn); /*free previous defn */
+    } 
+    // else /* already there */
+    //     free((void *) np->defn); /*free previous defn */
     if ((np->defn = hashstrdup(defn)) == NULL)
        return NULL;
     return np;

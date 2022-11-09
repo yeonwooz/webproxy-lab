@@ -1,11 +1,14 @@
 #include "csapp.h"
 #include "hash.c"
+#include "csapp.h"
+#include "cache.h"
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
-#define VERBOSE 1
-#define CONCURRENCY 2 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
+#define VERBOSE         1
+#define CONCURRENCY     2 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
+#define CACHE_ENABLE    0
 
 // struct cache_store {
 //   // char hostname[MAXLINE];
@@ -93,12 +96,16 @@ int main(int argc, char **argv) {
 #endif
 
 void doit(int client_fd) {
+    printf("cache_count=%d\n", cache_count);
     char hostname[MAXLINE], path[MAXLINE];  // 프록시가 요청을 보낼 서버의 hostname, 파일경로
     int port;
     
     char buf[MAXLINE], hdr[MAXLINE];
     char method[MAXLINE], uri[MAXLINE], version[MAXLINE];
-
+    int found = 0;
+    char payload[MAX_OBJECT_SIZE];
+    cnode_t * node;
+    size_t sum = 0;
     int server_fd;
 
     rio_t client_rio;     // 클라이언트와의 rio
@@ -139,22 +146,61 @@ void doit(int client_fd) {
     }
 
 
-    printf("caching!!!\n");
-      //  char url[100] = "abc";
-    // char value[100] ="1111";
-    
-    // install(url, value);
-    printf("cur uri=%s\n", uri);
-    struct nlist *cached = malloc(sizeof (struct nlist));
-    cached = lookup(uri);
-    if (cached) {
-      printf("\n\nname=%s\n", cached->name);
-      printf("\n\ndefn=%s\n", cached->defn);
-      Rio_writen(client_fd, cached->defn, strlen(cached->defn)); 
-      return;
+    if (CACHE_ENABLE) {
+        /* Critcal readcnt section begin */
+        P(&mutex);
+        readcnt++;
+        if (readcnt == 1)  // First in
+            P(&w);
+        V(&mutex);
+        /* Critcal readcnt section end */
+
+        /* Critcal reading section begin */
+        Cache_check();
+        if ((node = match(hostname, port, path)) != NULL) {
+            printf("Cache hit!\n");
+            delete(node);
+            enqueue(node);
+            Rio_writen(client_fd, node->payload, node->size);
+            printf("Senting respond %u bytes from cache\n",
+                   (unsigned int)node->size);
+            //fprintf(stdout, node->payload);
+            found = 1;
+        }        
+        /* Critcal reading section end */  
+
+        /* Critcal readcnt section begin */    
+        P(&mutex);
+        readcnt--;
+        if (readcnt == 0)
+            V(&w);
+        V(&mutex);
+        /* Critcal readcnt section end */
+
+        if (found == 1) {
+            printf("Proxy is exiting\n\n");
+            return;
+        }
+
+        printf("Cache miss!\n");
     }
 
-    printf("\ndone\n");
+    // printf("caching!!!\n");
+    //   //  char url[100] = "abc";
+    // // char value[100] ="1111";
+    
+    // // install(url, value);
+    // printf("cur uri=%s\n", uri);
+    // struct nlist *cached = malloc(sizeof (struct nlist));
+    // cached = find(uri);
+    // if (cached) {
+    //   printf("\n\nname=%s\n", cached->name);
+    //   printf("\n\ndefn=%s\n", cached->defn);
+    //   Rio_writen(client_fd, cached->defn, strlen(cached->defn)); 
+    //   return;
+    // }
+
+    // printf("\ndone\n");
 
     char port_value[100];
     sprintf(port_value,"%d",port);
@@ -166,9 +212,32 @@ void doit(int client_fd) {
     size_t n;
     while ((n=Rio_readnb(&server_rio, buf, MAXLINE)) > 0) {
       printf("sending buf = %s\n", buf);
-      install(uri, buf);
+      insert(uri, buf);
       Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
     }
+
+        if (CACHE_ENABLE) {
+        if (sum <= MAX_OBJECT_SIZE) {
+            node = new(hostname, port, path, payload, sum);
+
+            /* Critcal write section begin */
+            P(&w);
+            Cache_check();            
+            while (cache_load + sum > MAX_CACHE_SIZE) {
+                printf("!!!!!!!!!!!!!!!!!Cache evicted!!!!!!!!!!!!!!!!!!\n");
+                dequeue();
+            }
+            enqueue(node);
+            printf("The object has been cached\n");
+            printf("Current cache size is %d \n", cache_count);            
+            printf("Current cache load is %d bytes\n", cache_load);
+            //fprintf(stdout, payload);
+            Cache_check();
+            V(&w);
+            /* Critcal write section end */
+        }
+    }
+    
 }
 
 /*

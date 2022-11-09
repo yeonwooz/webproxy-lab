@@ -19,8 +19,8 @@ static const char *host_hdr_format = "Host: %s\r\n";
 static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
     "Firefox/10.0.3\r\n";
-static const char *connection_hdr = "Connection: close\r\n";
-static const char *proxy_connection_hdr = "Proxy-Connection: close\r\n";
+static const char *connection_hdr = "Connection: keep-alive\r\n";
+static const char *proxy_connection_hdr = "Proxy-Connection: keep-alive\r\n";
 static const char *Accept_hdr = "    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n";
 static const char *EOL = "\r\n";
 

@@ -49,12 +49,12 @@ typedef struct {
     sem_t wmutex;           /*protects accesses to cache*/
     sem_t rdcntmutex;       /*protects accesses to readcnt*/
 
-}cache_block;
+} cache_block;
 
 typedef struct {
     cache_block cacheobjs[CACHE_OBJS_COUNT];  /*ten cache blocks*/
     int cache_num;
-}Cache;
+} Cache;
 
 Cache cache;
 
@@ -65,21 +65,18 @@ int main(int argc, char **argv) {
   char client_hostname[MAXLINE], client_port[MAXLINE]; // 프록시가 요청을 받고 응답해줄 클라이언트의 IP, Port
   pthread_t tid;  // 스레드에 부여할 tid 번호 (unsigned long)
 
-  cache_init();
-
   if (argc != 2) {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
     exit(0);
   }
 
-
-  Signal(SIGPIPE,SIG_IGN);
+  cache_init();
 
   listenfd = Open_listenfd(argv[1]);  // 대기 회선
   while (1) {
     clientlen = sizeof(struct sockaddr_storage);
-    // clientfd = (int *)Malloc(sizeof(int));   // 여러개의 디스크립터를 만들 것이므로 덮어쓰지 못하도록 고유메모리에 할당
-    clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // 프록시가 서버로서 클라이언트와 맺는 파일 디스크립터(소켓 디스크립터) : 고유 식별되는 회선이자 메모리 그 자체
+    clientfd = (int *)Malloc(sizeof(int));   // 여러개의 디스크립터를 만들 것이므로 덮어쓰지 못하도록 고유메모리에 할당
+    *clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);  // 프록시가 서버로서 클라이언트와 맺는 파일 디스크립터(소켓 디스크립터) : 고유 식별되는 회선이자 메모리 그 자체
 
     Getnameinfo((SA *)&clientaddr, clientlen, client_hostname, MAXLINE, client_port, MAXLINE, 0);
     
@@ -92,8 +89,7 @@ int main(int argc, char **argv) {
       Close(*clientfd);
   
   #elif CONCURRENCY == 1
-      Pthread_create(&tid, NULL, thread, (void *)clientfd);
-  
+      Pthread_create(&tid, NULL, thread, *clientfd);
   #elif CONCURRENCY == 2 
     if (Fork() == 0) {
       Close(listenfd);
@@ -109,10 +105,8 @@ int main(int argc, char **argv) {
 
 #if CONCURRENCY == 1 
   void *thread(void *argptr) {
-
     int clientfd = (int)argptr;
     Pthread_detach((pthread_self()));
-
     doit(clientfd);
     Close(clientfd);
   }
@@ -324,6 +318,7 @@ int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *
 
 /**************************************
  * Cache Function
+ * https://github.com/yeonwooz/CSAPP-Labs
  **************************************/
 
 void cache_init(){

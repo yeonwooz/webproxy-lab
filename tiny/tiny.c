@@ -140,11 +140,17 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 	    strcpy(filename, ".");                        
 	    strcat(filename, uri);                           
 	    if (uri[strlen(uri)-1] == '/')                  
-	      strcat(filename, "home.html"); 
+      {
+        strcat(filename, "home.html"); 
+        printf("%s\n", filename);
+      }
       else {
-        uri = uri + strlen(uri);
+        uri = uri + strlen(uri)-5;
+        printf("strcasecmp(uri, 'adder')=%d\n", strcasecmp(uri, "adder"));
         if (!strcasecmp(uri, "adder")) {
-          strcat(filename, "adder.html"); 
+          strcat(filename, ".html");
+          printf("%s\n", filename);
+ 
         }
       }         
       if (VERBOSE) {

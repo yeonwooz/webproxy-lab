@@ -144,14 +144,14 @@ void doit(int client_fd) {
     // char value[100] ="1111";
     
     // install(url, value);
+    printf("cur uri=%s\n", uri);
     struct nlist *cached = malloc(sizeof (struct nlist));
-    // cached->name = malloc(sizeof(char *))
-    // cached->defn = malloc(sizeof(char *))
-
     cached = lookup(uri);
     if (cached) {
       printf("\n\nname=%s\n", cached->name);
       printf("\n\ndefn=%s\n", cached->defn);
+      Rio_writen(client_fd, cached->defn, strlen(cached->defn)); 
+      return;
     }
 
     printf("\ndone\n");

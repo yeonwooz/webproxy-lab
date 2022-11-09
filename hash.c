@@ -1,4 +1,5 @@
 #include "csapp.h"
+int cache_cnt = 0;
 
 unsigned hash(char *s);
 struct nlist *find(char *s);
@@ -32,13 +33,17 @@ struct nlist *find(char *s)
     struct nlist *np;
     for (np = hashtab[hash(s)]; np != NULL; np = np->next)
         if (strcmp(s, np->name) == 0)
+        {
+          printf("[find func]cache hit!!!!!");
           return np; /* found */
+        }
     return NULL; /* not found */
 }
 
 /* insert: put (name, defn) in hashtab */
 struct nlist *insert(char *name, char *defn)
 {
+    printf("inserting name=%s defn=%s\n", name, defn);
     struct nlist *np;
     unsigned hashval;
     if ((np = find(name)) == NULL) { /* not found */
@@ -48,6 +53,7 @@ struct nlist *insert(char *name, char *defn)
         hashval = hash(name);
         np->next = hashtab[hashval];
         hashtab[hashval] = np;
+        cache_cnt++;
     } 
     // else /* already there */
     //     free((void *) np->defn); /*free previous defn */

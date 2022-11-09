@@ -1,22 +1,11 @@
 #include "csapp.h"
 #include "hash.c"
-#include "csapp.h"
-#include "cache.h"
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
 #define VERBOSE         1
 #define CONCURRENCY     2 // 0: 시퀀셜, 1: 멀티스레드, 2: 멀티프로세스
-
-// struct cache_store {
-//   // char hostname[MAXLINE];
-//   // char port[MAXLINE];
-//   // char path[MAXLINE];
-//   char url[MAXLINE];  // 같은 url에 대한 요청인지 strcmp로 비교 예정
-//   char storage[MAX_CACHE_SIZE];
-// };
-
 
 void doit(int connfd);
 void clienterror(int fd, char *cause, char *errnum, 
@@ -95,16 +84,13 @@ int main(int argc, char **argv) {
 #endif
 
 void doit(int client_fd) {
-    printf("cache_count=%d\n", cache_count);
+    printf("cache_cnt=%d\n", cache_cnt);
     char hostname[MAXLINE], path[MAXLINE];  // 프록시가 요청을 보낼 서버의 hostname, 파일경로
     int port;
-    
+  
     char buf[MAXLINE], hdr[MAXLINE];
     char method[MAXLINE], uri[MAXLINE], version[MAXLINE];
-    int found = 0;
-    char payload[MAX_OBJECT_SIZE];
-    cnode_t * node;
-    size_t sum = 0;
+
     int server_fd;
 
     rio_t client_rio;     // 클라이언트와의 rio
@@ -137,22 +123,20 @@ void doit(int client_fd) {
                 "501 에러. 올바른 요청이 아닙니다.");
     }
 
-    // printf("caching!!!\n");
-    //   //  char url[100] = "abc";
-    // // char value[100] ="1111";
-    
-    // // install(url, value);
-    // printf("cur uri=%s\n", uri);
-    // struct nlist *cached = malloc(sizeof (struct nlist));
-    // cached = find(uri);
-    // if (cached) {
-    //   printf("\n\nname=%s\n", cached->name);
-    //   printf("\n\ndefn=%s\n", cached->defn);
-    //   Rio_writen(client_fd, cached->defn, strlen(cached->defn)); 
-    //   return;
-    // }
-
-    // printf("\ndone\n");
+    struct nlist *cached = malloc(sizeof (struct nlist));
+    cached = find(uri);
+    if (cached) {
+      if (VERBOSE) {
+        printf("====================cache hit======================\n");
+        printf("\n\nname=%s\n", cached->name);
+        printf("\n\ndefn=%s\n", cached->defn);
+      }
+      Rio_writen(client_fd, cached->defn, strlen(cached->defn)); 
+      return;
+    }
+    if (VERBOSE) {
+      printf("====================cache miss======================\n");
+    }
 
     char port_value[100];
     sprintf(port_value,"%d",port);
@@ -171,10 +155,10 @@ void doit(int client_fd) {
 
     size_t n;
     while ((n=Rio_readnb(&server_rio, buf, MAXLINE)) > 0) {
-      printf("sending buf = %s\n", buf);
       insert(uri, buf);
       Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
     } 
+    Close(server_fd);
 }
 
 /*

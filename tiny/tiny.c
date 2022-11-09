@@ -5,6 +5,7 @@
  */
 #include "csapp.h"
 #include "echo.c"
+#define VERBOSE 0
 
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
@@ -27,7 +28,6 @@ int main(int argc, char **argv)
       fprintf(stderr, "usage: %s <port>\n", argv[0]);
 	    exit(1);
     }
-    // port = atoi(argv[1]);
 
     listenfd = Open_listenfd(argv[1]);
     while (1) {
@@ -53,46 +53,56 @@ void doit(int fd)
   
     /* Read request line and headers */
     Rio_readinitb(&rio, fd);
-    Rio_readlineb(&rio, buf, MAXLINE);                   //line:netp:doit:readrequest
-    printf("Request headers:\n");
-    printf("%s", buf);
-    sscanf(buf, "%s %s %s", method, uri, version);       
+    Rio_readlineb(&rio, buf, MAXLINE);              
+    sscanf(buf, "%s %s %s", method, uri, version);
+
+    if (VERBOSE) {
+      printf("Request headers:\n");
+      printf("%s\n", buf);
+    }
 
     if (strcasecmp(method,"GET") && strcasecmp(method,"HEAD")) {     
-        printf("501 ERROR\n");
+        if (VERBOSE) {
+          printf("501 ERROR\n");
+        } 
         clienterror(fd, method, "501", "잘못된 요청",
                 "501 에러. 올바른 요청이 아닙니다.");
         return;
     }                                                 
 
     read_requesthdrs(&rio);                            
-
-    printf("[server]starts parse\n");
+    if (VERBOSE) {
+      printf("[server]starts parse\n");
+    } 
     /* Parse URI from GET request */
     is_static = parse_uri(uri, filename, cgiargs);       //line:netp:doit:staticcheck
     if (stat(filename, &sbuf) < 0) {                     //line:netp:doit:beginnotfound
-      printf("404 ERROR\n");
+      if (VERBOSE) {
+        printf("404 ERROR\n");
+      } 
       clienterror(fd, filename, "404", "Not found", "요청하신 파일을 찾을 수 없습니다.");
 	    return;
-    }                                                    //line:netp:doit:endnotfound
+    }                                                    
 
     if (is_static) { /* Serve static content */          
 
-    if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) { //line:netp:doit:readable
+    if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) { 
         clienterror(fd, filename, "403", "Forbidden",
-        "Tiny couldn't read the file");
+        "파일을 실행할 수 없습니다.");
         return;
     }
 	  serve_static(fd, filename, sbuf.st_size, method);        //line:netp:doit:servestatic
     }
     else { /* Serve dynamic content */
-      printf("[server]is_dynamic\n");
+      if (VERBOSE) {
+        printf("[server]is_dynamic\n");
+      } 
 
-      if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { //line:netp:doit:executable
+      if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
 	      clienterror(fd, filename, "403", "Forbidden", "요청하신 파일을 실행할 수 없습니다.");
 	    return;
 	  }
-	  serve_dynamic(fd, filename, cgiargs, method);            //line:netp:doit:servedynamic
+	  serve_dynamic(fd, filename, cgiargs, method);          
   }
 }
 /* $end doit */
@@ -108,7 +118,9 @@ void read_requesthdrs(rio_t *rp)
     Rio_readlineb(rp, buf, MAXLINE);
     while(strcmp(buf, "\r\n")) {          //line:netp:readhdrs:checkterm
 	    Rio_readlineb(rp, buf, MAXLINE);
-	    printf("%s", buf);
+      if (VERBOSE) {
+	      printf("%s", buf);
+      } 
     }
     return;
 }
@@ -129,8 +141,9 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 	    strcat(filename, uri);                           //line:netp:parseuri:endconvert1
 	    if (uri[strlen(uri)-1] == '/')                   //line:netp:parseuri:slashcheck
 	      strcat(filename, "home.html");               //line:netp:parseuri:appenddefault  
-      
-      printf("filename=%s\n", filename);
+      if (VERBOSE) {
+        printf("filename=%s\n", filename);
+      } 
 	    return 1;
     }
     else {  /* Dynamic content */                        //line:netp:parseuri:isdynamic
@@ -163,9 +176,11 @@ void serve_static(int fd, char *filename, int filesize, char* method)
     sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
     sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
     sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
-    Rio_writen(fd, buf, strlen(buf));      
-    printf("Response headers:\n");
-    printf("serve_static buffffff=>%s", buf);
+    Rio_writen(fd, buf, strlen(buf));
+    if (VERBOSE) {
+      printf("Response headers:\n");
+      printf("serve_static buffffff=>%s", buf);
+    }      
 
     if (!strcasecmp(method, "HEAD")){
       // HEAD  메서드로 들어왔다면 스트링이 일치하여 0
@@ -179,8 +194,10 @@ void serve_static(int fd, char *filename, int filesize, char* method)
     srcp = (char *)malloc(filesize);
     Rio_readn(srcfd, srcp, filesize);
 
-    printf("3. [I'm server] server -> proxy\n");
-    printf("srcp=%s, filesize=%d\n", srcp, filesize);
+    if (VERBOSE) {
+      printf("3. [I'm server] server -> proxy\n");
+      printf("srcp=%s, filesize=%d\n", srcp, filesize);
+    }
     Rio_writen(fd, srcp, filesize);         
     // Close(srcfd);                           
     // Munmap(srcp, filesize);                
@@ -246,7 +263,9 @@ void serve_dynamic(int fd, char *filename, char *cgiargs, char* method)
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg) 
 {
-    printf("client error\n");
+    if (VERBOSE) {
+      printf("client error\n");
+    }
     char buf[MAXLINE], body[MAXBUF];
 
     /* Build the HTTP response body */

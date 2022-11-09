@@ -11,7 +11,8 @@ void *thread(void *vargp);  // Pthread_create 에 루틴 반환형이 정의되�
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
-
+#define VERBOSE
+#
 /* You won't lose style points for including this long line in your code */
 // https://developer.mozilla.org/ko/docs/Glossary/Request_header
 static const char *request_hdr_format = "%s %s HTTP/1.0\r\n";

@@ -189,13 +189,16 @@ void doit(int client_fd) {
                 "501 에러. 올바른 요청이 아닙니다.");
     }
 
-    // char cached[MAX_CACHE_SIZE];
-    // strcpy(cached, lookup(*uri));
+    printf("caching!!!\n");
+    char cached[MAX_CACHE_SIZE];
+    // strcpy(cached, lookup(uri));
+    printf("%s\n", cached);
     // if (cached) {
     //   Rio_writen(client_fd, cached, strlen(cached)); 
     //   return;
     // }
-    
+    printf("caching done!!!\n");
+
     char port_value[100];
     sprintf(port_value,"%d",port);
     server_fd = Open_clientfd(hostname, port_value); // 서버와의 소켓 디스크립터 생성
@@ -204,12 +207,11 @@ void doit(int client_fd) {
     Rio_writen(server_fd, hdr, strlen(hdr)); // 서버에 req 보냄
 
     size_t n;
-    while (1) {
-      n=Rio_readnb(&server_rio, buf, MAXLINE);
-      if (n == 0)  break;
+    while (n=Rio_readnb(&server_rio, buf, MAXLINE) > 0) {
+
 
       Rio_writen(client_fd, buf, n);   // 클라이언트에게 응답 전달
-      install(uri, buf);
+      // install(uri, buf);
     }
     Close(server_fd);
 }

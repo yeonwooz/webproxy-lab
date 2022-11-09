@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
       Close(*clientfd);
   
   #elif CONCURRENCY == 1
-      Pthread_create(&tid, NULL, thread, *clientfd);
+      Pthread_create(&tid, NULL, thread, (void *)clientfd);
   #elif CONCURRENCY == 2 
     if (Fork() == 0) {
       Close(listenfd);
@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
 
 #if CONCURRENCY == 1 
   void *thread(void *argptr) {
-    int clientfd = (int)argptr;
+    int clientfd = *((int *)argptr);
     Pthread_detach((pthread_self()));
     doit(clientfd);
     Close(clientfd);
@@ -319,6 +319,10 @@ int make_request(rio_t* client_rio, char *hostname, char *path, int port, char *
 /**************************************
  * Cache Function
  * https://github.com/yeonwooz/CSAPP-Labs
+ * 
+ * 
+ * P: 스레드가 진입시 임계영역 잠금 
+ * V: 스레드가 퇴장히 임계영역 열어줌
  **************************************/
 
 void cache_init(){
@@ -391,6 +395,7 @@ int cache_eviction(){
 
     return minindex;
 }
+
 /*update the LRU number except the new cache one*/
 void cache_LRU(int index){
     int i;
@@ -411,9 +416,7 @@ void cache_LRU(int index){
     }
 }
 /*cache the uri and content in cache*/
-void cache_uri(char *uri,char *buf){
-
-
+void cache_uri(char *uri,char *buf) {
     int i = cache_eviction();
 
     writePre(i);/*writer P*/
